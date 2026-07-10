@@ -44,6 +44,12 @@ then put your project-specific tasks in `.taskfiles/project/project.yml`.
 
 ## Refresh an already-adopted repo
 
+Check whether you're behind the latest release first:
+
+```bash
+task sync:check    # e.g. "Update available: v1.0.0 -> v1.1.0"
+```
+
 A bare `task sync` re-pulls the **same version this repo shipped with** (the
 default baked into its root `Taskfile.yaml`), so it never surprises you with an
 upgrade. Upgrading is explicit:
