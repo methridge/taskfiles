@@ -1,0 +1,8 @@
+# markdownlint config — https://github.com/DavidAnson/markdownlint
+# Prose wraps at 80; code blocks and tables (URLs, one-liners) are exempt since
+# they can't be broken without harming copy/paste or readability.
+default: true
+MD013:
+  line_length: 80
+  code_blocks: false
+  tables: false

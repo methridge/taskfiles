@@ -9,7 +9,7 @@ separately in `.taskfiles/project/project.yml`, which sync never touches.
 
 ## Layout
 
-```
+```text
 Taskfile.yaml                 # generic root — identical in every consumer repo
 .taskfiles/
   shared/                     # vendored from here; do not hand-edit in consumers
@@ -75,7 +75,7 @@ Then `task sync` always tracks that ref and file set. See [`example.envrc`](exam
 ## The git workflow (from `git.yml`)
 
 | Task | What it does |
-|------|--------------|
+| ---- | ------------ |
 | `merge` (aliases `mr`, `pr`) | Open a PR (GitHub) or MR (GitLab) for the current branch, wait for checks, merge with a real merge commit, clean up. Auto-detects the host. |
 | `review:<PR#>` | Show a GitHub PR (metadata, checks, diff), then optionally approve and merge. |
 | `pre` | `pre-commit autoupdate` + `gc` + `run -a`. |
