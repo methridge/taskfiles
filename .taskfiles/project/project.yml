@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+# https://taskfile.dev
+#
+# Project-specific tasks for the methridge/taskfiles repo itself. This is the
+# repo-owned layer (`task sync` never touches .taskfiles/project/).
+
+version: "3"
+
+tasks:
+  lint:
+    desc: Shellcheck the vendored scripts and init.sh
+    preconditions:
+      - sh: 'command -v shellcheck >/dev/null 2>&1'
+        msg: "shellcheck required: brew install shellcheck"
+    cmds:
+      - shellcheck -x --source-path=SCRIPTDIR .taskfiles/shared/scripts/*.sh init.sh
