@@ -90,14 +90,18 @@ See [STANDARD.md](STANDARD.md) for the conventions every Taskfile follows.
 ## Cutting a release (maintainers)
 
 ```bash
-task release:v1.1.0
+task release            # next version, auto-computed from conventional commits (autotag)
+task release:v1.0.0    # explicit version — required for the FIRST release, or a major bump
 ```
 
-This stamps `v1.1.0` into the root `Taskfile.yaml` sync default (so consumers on
-that release re-sync idempotently), commits, pushes the signed tag, and
-publishes a GitHub Release with `init.sh` attached - so
-`releases/latest/download/init.sh` immediately serves the new bootstrap. No
-other version strings to bump.
+Both stamp the version into the root `Taskfile.yaml` sync default (so consumers
+on that release re-sync idempotently), commit, push the signed tag, and publish
+a GitHub Release with `init.sh` attached - so `releases/latest/download/init.sh`
+immediately serves the new bootstrap. No other version strings to bump.
+
+`task release` uses `autotag --scheme=conventional`, which needs a prior tag to
+bump from; the first release has none, so cut it explicitly (`task
+release:v1.0.0`), mirroring the `tag0` → `tagauto` split in the shared workflow.
 
 ## Tools the workflow assumes
 

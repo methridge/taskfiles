@@ -15,13 +15,40 @@ tasks:
     cmds:
       - shellcheck -x --source-path=SCRIPTDIR .taskfiles/shared/scripts/*.sh init.sh
 
-  release:*:
-    desc: "Stamp the version, commit, tag, and publish a GitHub Release with init.sh (release:v1.1.0)"
+  release:
+    desc: "Release the next version, auto-computed from conventional commits (autotag)"
+    preconditions:
+      - sh: 'command -v autotag >/dev/null 2>&1'
+        msg: "autotag required: https://github.com/pantheon-systems/autotag"
     vars:
-      VERSION: "{{index .MATCH 0}}"
+      # autotag -n prints the next version (no 'v', no tag); it exits non-zero
+      # when there is no prior tag to bump from, leaving VERSION empty.
+      NEXT:
+        sh: 'autotag -n --scheme=conventional 2>/dev/null || true'
+      VERSION: '{{if .NEXT}}v{{.NEXT}}{{end}}'
+    cmds:
+      - |
+        if [ -z "{{.VERSION}}" ]; then
+          echo "autotag found no prior tag to bump from." >&2
+          echo "Cut the first release explicitly, e.g.:  task release:v1.0.0" >&2
+          exit 1
+        fi
+      - task: _release
+        vars: { VERSION: '{{.VERSION}}' }
+
+  release:*:
+    desc: "Release an explicit version — for the first release or a major bump (release:v1.0.0)"
+    cmds:
+      - task: _release
+        vars: { VERSION: '{{index .MATCH 0}}' }
+
+  _release:
+    internal: true
+    requires:
+      vars: [VERSION]
     preconditions:
       - sh: 'case "{{.VERSION}}" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
-        msg: "version must look like vX.Y.Z, e.g. release:v1.1.0"
+        msg: "version must look like vX.Y.Z, got '{{.VERSION}}'"
       - sh: 'git config --get user.signingkey >/dev/null 2>&1'
         msg: "git signing key required for signed tags"
       - sh: 'command -v gh >/dev/null 2>&1'
