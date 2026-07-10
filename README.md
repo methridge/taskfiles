@@ -24,16 +24,18 @@ init.sh                       # one-time bootstrap for a repo with no Taskfile
 
 ## Bootstrap a repo (no Taskfile yet)
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/v1.0.0/init.sh \
-  | bash -s -- v1.0.0
-```
-
-Add optional shared files as extra args, e.g. a Go repo:
+Defaults to the **latest** release (resolved via `git ls-remote`); the init
+script itself is fetched from `main`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/v1.0.0/init.sh \
-  | bash -s -- v1.0.0 go.yml
+# latest release
+curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh | bash
+
+# latest, also vendoring go.yml (a Go repo) — extra files come after the ref
+curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh | bash -s -- latest go.yml
+
+# pin to a specific release
+curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh | bash -s -- v1.0.0
 ```
 
 Commit the resulting `.taskfiles/` into your repo (it is vendored, not ignored),
@@ -41,14 +43,19 @@ then put your project-specific tasks in `.taskfiles/project/project.yml`.
 
 ## Refresh an already-adopted repo
 
+A bare `task sync` re-pulls the **same version this repo shipped with** (the
+default baked into its root `Taskfile.yaml`), so it never surprises you with an
+upgrade. Upgrading is explicit:
+
 ```bash
-task sync                                   # uses the default ref
-task sync TASKFILES_REF=v1.1.0             # bump to a newer release (one-off)
+task sync                                   # stay on the current version (idempotent)
+task sync TASKFILES_REF=v1.1.0             # upgrade to a newer release (one-off)
 task sync TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"
 ```
 
-`sync` overwrites only the generic root `Taskfile.yaml` and files under
-`.taskfiles/shared/`. It never writes to `.taskfiles/project/`.
+`TASKFILES_REF` for `sync` must be a concrete tag (unlike `init.sh`, `sync` does
+not resolve `latest`). `sync` overwrites only the generic root `Taskfile.yaml`
+and files under `.taskfiles/shared/`; it never writes to `.taskfiles/project/`.
 
 ### Pin a version durably (recommended)
 
@@ -78,6 +85,17 @@ Then `task sync` always tracks that ref and file set. See [`example.envrc`](exam
 | `tagcal` | Signed tag with calendar version. |
 
 See [STANDARD.md](STANDARD.md) for the conventions every Taskfile follows.
+
+## Cutting a release (maintainers)
+
+```bash
+task release:v1.1.0
+```
+
+This stamps `v1.1.0` into the root `Taskfile.yaml` sync default (so consumers on
+that release re-sync idempotently), commits, and creates + pushes the signed
+tag. `init.sh` picks up the new tag as `latest` automatically - no other version
+strings to bump.
 
 ## Tools the workflow assumes
 

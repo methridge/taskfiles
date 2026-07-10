@@ -14,3 +14,25 @@ tasks:
         msg: "shellcheck required: brew install shellcheck"
     cmds:
       - shellcheck -x --source-path=SCRIPTDIR .taskfiles/shared/scripts/*.sh init.sh
+
+  release:*:
+    desc: "Stamp the version into the sync default, commit, and cut a signed tag (release:v1.1.0)"
+    vars:
+      VERSION: "{{index .MATCH 0}}"
+    preconditions:
+      - sh: 'case "{{.VERSION}}" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
+        msg: "version must look like vX.Y.Z, e.g. release:v1.1.0"
+      - sh: 'git config --get user.signingkey >/dev/null 2>&1'
+        msg: "git signing key required for signed tags"
+    cmds:
+      # Stamp the sync default so a bare `task sync` in a consumer re-pulls this
+      # same version (portable in-place edit via tmpfile).
+      - |
+        tmp="$(mktemp)"
+        sed -E 's|(default ")v[0-9]+\.[0-9]+\.[0-9]+(")|\1{{.VERSION}}\2|' Taskfile.yaml > "$tmp"
+        mv "$tmp" Taskfile.yaml
+      - git add Taskfile.yaml
+      - 'git commit -m "chore: release {{.VERSION}}"'
+      - git tag -s {{.VERSION}} -m "{{.VERSION}}"
+      - git push
+      - git push --tags

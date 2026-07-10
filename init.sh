@@ -6,21 +6,45 @@
 # existing project.yml.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/v1.0.0/init.sh \
+#   curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh \
 #     | bash -s -- [REF] [extra shared files...]
-# REF may also come from the TASKFILES_REF env var (positional arg wins).
+# REF (first positional, else $TASKFILES_REF) defaults to "latest", which resolves
+# to the newest vX.Y.Z tag. Pass an explicit tag to pin. Extra shared files come
+# AFTER the ref.
 # Examples:
-#   ... | bash -s -- v1.0.0            # base: git.yml + scripts
-#   ... | bash -s -- v1.0.0 go.yml     # also vendor go.yml
+#   ... | bash                         # latest: git.yml + scripts
+#   ... | bash -s -- latest go.yml     # latest, also vendor go.yml
+#   ... | bash -s -- v1.0.0            # pin to v1.0.0
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-REF="${1:-${TASKFILES_REF:-v1.0.0}}"
+REPO="https://github.com/methridge/taskfiles"
+
+REF="${1:-${TASKFILES_REF:-latest}}"
 shift || true
+
+if [[ "$REF" != "latest" && "$REF" != v* ]]; then
+  echo "First arg is the version ref (v1.0.0 or 'latest'); got '${REF}'." >&2
+  echo "Extra shared files go after the ref: ... | bash -s -- latest go.yml" >&2
+  exit 1
+fi
+
+if [[ "$REF" == "latest" ]]; then
+  REF="$(git ls-remote --tags --refs --sort=-v:refname "${REPO}.git" 'v*' 2>/dev/null \
+    | sed -n '1s#.*/##p' || true)"
+  if [[ -z "$REF" ]]; then
+    echo "Could not resolve a latest tag from ${REPO} (no releases yet?)." >&2
+    echo "Pass one explicitly, e.g.  ... | bash -s -- v1.0.0" >&2
+    exit 1
+  fi
+fi
+
 BASE="https://raw.githubusercontent.com/methridge/taskfiles/${REF}"
 SHARED=(git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh "$@")
+
+echo "Bootstrapping from methridge/taskfiles @ ${REF}"
 
 mkdir -p .taskfiles/shared/scripts .taskfiles/project
 

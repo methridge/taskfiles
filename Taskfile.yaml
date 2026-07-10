@@ -35,9 +35,10 @@ tasks:
 
   sync:
     desc: Re-vendor the generic root + shared taskfiles from methridge/taskfiles
-    # Both vars can be set on the CLI (TASKFILES_REF=v1.1.0) or via an env var of
-    # the same name (e.g. `export TASKFILES_REF` in .envrc to pin this repo's
-    # version durably — the root default below is overwritten on every sync).
+    # TASKFILES_REF default = the release this file shipped with, so a bare
+    # `task sync` re-pulls the same version (idempotent, no surprise upgrades).
+    # It is stamped at release time (see the `release:*` task). Upgrade explicitly
+    # with TASKFILES_REF on the CLI or, durably, `export TASKFILES_REF` in .envrc.
     vars:
       TASKFILES_REF: '{{.TASKFILES_REF | default "v1.0.0"}}'
       TASKFILES_FILES: '{{.TASKFILES_FILES | default "git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"}}'
