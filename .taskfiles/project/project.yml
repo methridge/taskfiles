@@ -16,7 +16,7 @@ tasks:
       - shellcheck -x --source-path=SCRIPTDIR .taskfiles/shared/scripts/*.sh init.sh
 
   release:*:
-    desc: "Stamp the version into the sync default, commit, and cut a signed tag (release:v1.1.0)"
+    desc: "Stamp the version, commit, tag, and publish a GitHub Release with init.sh (release:v1.1.0)"
     vars:
       VERSION: "{{index .MATCH 0}}"
     preconditions:
@@ -24,15 +24,25 @@ tasks:
         msg: "version must look like vX.Y.Z, e.g. release:v1.1.0"
       - sh: 'git config --get user.signingkey >/dev/null 2>&1'
         msg: "git signing key required for signed tags"
+      - sh: 'command -v gh >/dev/null 2>&1'
+        msg: "gh (GitHub CLI) required to publish the release: brew install gh"
     cmds:
       # Stamp the sync default so a bare `task sync` in a consumer re-pulls this
-      # same version (portable in-place edit via tmpfile).
+      # same version. Skip the commit if it is already at VERSION (first release).
       - |
         tmp="$(mktemp)"
         sed -E 's|(default ")v[0-9]+\.[0-9]+\.[0-9]+(")|\1{{.VERSION}}\2|' Taskfile.yaml > "$tmp"
-        mv "$tmp" Taskfile.yaml
-      - git add Taskfile.yaml
-      - 'git commit -m "chore: release {{.VERSION}}"'
+        if cmp -s "$tmp" Taskfile.yaml; then
+          rm -f "$tmp"
+          echo "Taskfile.yaml already at {{.VERSION}}; skipping stamp commit."
+        else
+          mv "$tmp" Taskfile.yaml
+          git add Taskfile.yaml
+          git commit -m "chore: release {{.VERSION}}"
+        fi
       - git tag -s {{.VERSION}} -m "{{.VERSION}}"
       - git push
       - git push --tags
+      # Publish a Release from the signed tag and attach init.sh, so
+      # releases/latest/download/init.sh always serves the released bootstrap.
+      - gh release create {{.VERSION}} init.sh --title "{{.VERSION}}" --generate-notes

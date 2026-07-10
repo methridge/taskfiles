@@ -24,18 +24,19 @@ init.sh                       # one-time bootstrap for a repo with no Taskfile
 
 ## Bootstrap a repo (no Taskfile yet)
 
-Defaults to the **latest** release (resolved via `git ls-remote`); the init
-script itself is fetched from `main`.
+The init script is served from the **latest GitHub Release** (attached as a
+release asset), so you never run an unreleased `main` version. With no ref it
+also vendors the latest release's content.
 
 ```bash
 # latest release
-curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh | bash
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash
 
 # latest, also vendoring go.yml (a Go repo) — extra files come after the ref
-curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh | bash -s -- latest go.yml
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest go.yml
 
-# pin to a specific release
-curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh | bash -s -- v1.0.0
+# pin to a specific release (script + content from that tag)
+curl -fsSL https://github.com/methridge/taskfiles/releases/download/v1.0.0/init.sh | bash -s -- v1.0.0
 ```
 
 Commit the resulting `.taskfiles/` into your repo (it is vendored, not ignored),
@@ -93,9 +94,10 @@ task release:v1.1.0
 ```
 
 This stamps `v1.1.0` into the root `Taskfile.yaml` sync default (so consumers on
-that release re-sync idempotently), commits, and creates + pushes the signed
-tag. `init.sh` picks up the new tag as `latest` automatically - no other version
-strings to bump.
+that release re-sync idempotently), commits, pushes the signed tag, and
+publishes a GitHub Release with `init.sh` attached - so
+`releases/latest/download/init.sh` immediately serves the new bootstrap. No
+other version strings to bump.
 
 ## Tools the workflow assumes
 

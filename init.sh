@@ -5,8 +5,8 @@
 # and a .taskfiles/project/project.yml stub. Idempotent — never clobbers an
 # existing project.yml.
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/methridge/taskfiles/main/init.sh \
+# Usage (served from the latest GitHub Release):
+#   curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh \
 #     | bash -s -- [REF] [extra shared files...]
 # REF (first positional, else $TASKFILES_REF) defaults to "latest", which resolves
 # to the newest vX.Y.Z tag. Pass an explicit tag to pin. Extra shared files come
