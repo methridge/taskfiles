@@ -47,6 +47,10 @@ implementation is this repo.
   ```
   or into `requires:` when there is no safe default. Where an override must be
   explicit, use the `{{env "NAME"}}` template function.
-- Document required environment in an `example.envrc` (copy to `.envrc`).
+- Document required environment in an `example.envrc`. Start from the template
+  [`example.envrc`](example.envrc) in this repo: copy it into your repo, list
+  the vars your tasks need, and commit it (but never commit the filled-in
+  `.envrc`). This repo itself needs no env, so its `example.envrc` is a
+  commented skeleton only.
 - Scripts called by tasks resolve their own siblings via `BASH_SOURCE`, so they
   are relocation-safe once vendored under `.taskfiles/shared/scripts/`.
