@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+# https://taskfile.dev
+#
+# From methridge/taskfiles (canonical). In consumer repos this is vendored into
+# .taskfiles/shared/ — do not hand-edit there; edit upstream and run 'task sync'.
+
+version: "3"
+
+tasks:
+  playbook:
+    desc: Run Ansible playbook
+    preconditions:
+      - sh: 'command -v ansible-playbook >/dev/null 2>&1'
+        msg: "ansible-playbook required: pipx install ansible"
+    cmds:
+      - ansible-playbook -v playbooks/update.yml

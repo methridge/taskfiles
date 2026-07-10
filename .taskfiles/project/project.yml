@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+# https://taskfile.dev
+#
+# Project-specific tasks for the methridge/taskfiles repo itself. This is the
+# repo-owned layer (`task sync` never touches .taskfiles/project/).
+
+version: "3"
+
+tasks:
+  lint:
+    desc: Shellcheck the vendored scripts and init.sh
+    preconditions:
+      - sh: 'command -v shellcheck >/dev/null 2>&1'
+        msg: "shellcheck required: brew install shellcheck"
+    cmds:
+      - shellcheck -x --source-path=SCRIPTDIR .taskfiles/shared/scripts/*.sh init.sh
+
+  release:
+    desc: "Release the next version, auto-computed from conventional commits (autotag)"
+    preconditions:
+      - sh: 'command -v autotag >/dev/null 2>&1'
+        msg: "autotag required: https://github.com/pantheon-systems/autotag"
+    vars:
+      # autotag -n prints the next version (no 'v', no tag); it exits non-zero
+      # when there is no prior tag to bump from, leaving VERSION empty.
+      NEXT:
+        sh: 'autotag -n --scheme=conventional 2>/dev/null || true'
+      VERSION: '{{if .NEXT}}v{{.NEXT}}{{end}}'
+    cmds:
+      - |
+        if [ -z "{{.VERSION}}" ]; then
+          echo "autotag found no prior tag to bump from." >&2
+          echo "Cut the first release explicitly, e.g.:  task release:v1.0.0" >&2
+          exit 1
+        fi
+      - task: _release
+        vars: { VERSION: '{{.VERSION}}' }
+
+  release:*:
+    desc: "Release an explicit version — for the first release or a major bump (release:v1.0.0)"
+    cmds:
+      - task: _release
+        vars: { VERSION: '{{index .MATCH 0}}' }
+
+  _release:
+    internal: true
+    requires:
+      vars: [VERSION]
+    preconditions:
+      - sh: 'case "{{.VERSION}}" in v[0-9]*.[0-9]*.[0-9]*) exit 0 ;; *) exit 1 ;; esac'
+        msg: "version must look like vX.Y.Z, got '{{.VERSION}}'"
+      - sh: 'git config --get user.signingkey >/dev/null 2>&1'
+        msg: "git signing key required for signed tags"
+      - sh: 'command -v gh >/dev/null 2>&1'
+        msg: "gh (GitHub CLI) required to publish the release: brew install gh"
+    cmds:
+      # Stamp the sync default so a bare `task sync` in a consumer re-pulls this
+      # same version. Skip the commit if it is already at VERSION (first release).
+      - |
+        tmp="$(mktemp)"
+        sed -E 's|(default ")v[0-9]+\.[0-9]+\.[0-9]+(")|\1{{.VERSION}}\2|' Taskfile.yaml > "$tmp"
+        if cmp -s "$tmp" Taskfile.yaml; then
+          rm -f "$tmp"
+          echo "Taskfile.yaml already at {{.VERSION}}; skipping stamp commit."
+        else
+          mv "$tmp" Taskfile.yaml
+          git add Taskfile.yaml
+          git commit -m "chore: release {{.VERSION}}"
+        fi
+      - git tag -s {{.VERSION}} -m "{{.VERSION}}"
+      - git push
+      - git push --tags
+      # Publish a Release from the signed tag and attach init.sh, so
+      # releases/latest/download/init.sh always serves the released bootstrap.
+      - gh release create {{.VERSION}} init.sh --title "{{.VERSION}}" --generate-notes
