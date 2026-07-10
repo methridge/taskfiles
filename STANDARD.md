@@ -47,6 +47,12 @@ implementation is this repo.
   ```
   or into `requires:` when there is no safe default. Where an override must be
   explicit, use the `{{env "NAME"}}` template function.
+- Task reads a variable from an environment variable of the **same name** (no
+  `TASK_` prefix; verified on Task 3.50.0). Precedence, high to low: a CLI arg
+  `VAR=value` > an env var > the taskfile `default`. So `VAULT_ADDR:
+  '{{.VAULT_ADDR | default "..."}}'` picks up `$VAULT_ADDR` from `.envrc`, and a
+  CLI arg still wins for a one-off. This is also how a repo pins the taskfiles
+  version it syncs to — `export TASKFILES_REF` in `.envrc`.
 - Document required environment in an `example.envrc`. Start from the template
   [`example.envrc`](example.envrc) in this repo: copy it into your repo, list
   the vars your tasks need, and commit it (but never commit the filled-in

@@ -35,14 +35,17 @@ tasks:
 
   sync:
     desc: Re-vendor the generic root + shared taskfiles from methridge/taskfiles
+    # Both vars can be set on the CLI (TASKFILES_REF=v1.1.0) or via an env var of
+    # the same name (e.g. `export TASKFILES_REF` in .envrc to pin this repo's
+    # version durably — the root default below is overwritten on every sync).
     vars:
-      REF: '{{.REF | default "v1.0.0"}}'
-      SHARED: '{{.SHARED | default "git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"}}'
-      BASE: 'https://raw.githubusercontent.com/methridge/taskfiles/{{.REF}}'
+      TASKFILES_REF: '{{.TASKFILES_REF | default "v1.0.0"}}'
+      TASKFILES_FILES: '{{.TASKFILES_FILES | default "git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"}}'
+      BASE: 'https://raw.githubusercontent.com/methridge/taskfiles/{{.TASKFILES_REF}}'
     cmds:
       # Generic root — safe to overwrite; project tasks live in .taskfiles/project/.
       - curl -fsSL "{{.BASE}}/Taskfile.yaml" -o Taskfile.yaml
-      - for: { var: SHARED, split: " " }
+      - for: { var: TASKFILES_FILES, split: " " }
         cmd: |
           mkdir -p ".taskfiles/shared/$(dirname "{{.ITEM}}")"
           curl -fsSL "{{.BASE}}/.taskfiles/shared/{{.ITEM}}" -o ".taskfiles/shared/{{.ITEM}}"

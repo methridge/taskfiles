@@ -42,13 +42,27 @@ then put your project-specific tasks in `.taskfiles/project/project.yml`.
 ## Refresh an already-adopted repo
 
 ```bash
-task sync                       # pins to the default ref in the root Taskfile
-task sync REF=v1.1.0            # bump to a newer release
-task sync SHARED="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"
+task sync                                   # uses the default ref
+task sync TASKFILES_REF=v1.1.0             # bump to a newer release (one-off)
+task sync TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"
 ```
 
 `sync` overwrites only the generic root `Taskfile.yaml` and files under
 `.taskfiles/shared/`. It never writes to `.taskfiles/project/`.
+
+### Pin a version durably (recommended)
+
+Because `task sync` overwrites the root `Taskfile.yaml`, editing its default ref
+won't stick. Both sync vars are read from an env var of the same name (a CLI arg
+still overrides), so pin them in the repo's `.envrc` instead — it isn't synced:
+
+```bash
+# .envrc
+export TASKFILES_REF="v1.1.0"
+export TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"
+```
+
+Then `task sync` always tracks that ref and file set. See [`example.envrc`](example.envrc).
 
 ## The git workflow (from `git.yml`)
 
