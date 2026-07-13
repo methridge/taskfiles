@@ -41,7 +41,20 @@ if [[ "$REF" == "latest" ]]; then
   fi
 fi
 
-BASE="https://raw.githubusercontent.com/methridge/taskfiles/${REF}"
+BASE="${TASKFILES_BASE:-https://raw.githubusercontent.com/methridge/taskfiles/${REF}}"
+
+# Pull an optional `precommit=NAME` token out of the args so it is not treated
+# as an extra shared task file. Default to the base template; `none` opts out.
+PRECOMMIT="base"
+REST=()
+for a in "$@"; do
+  case "$a" in
+    precommit=*) PRECOMMIT="${a#precommit=}" ;;
+    *) REST+=("$a") ;;
+  esac
+done
+set -- "${REST[@]+"${REST[@]}"}"
+
 SHARED=(git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh "$@")
 
 echo "Bootstrapping from methridge/taskfiles @ ${REF}"
@@ -67,6 +80,23 @@ version: "3"
 
 tasks: {}
 EOF
+fi
+
+if [[ "$PRECOMMIT" != "none" ]]; then
+  if [[ -f .pre-commit-config.yaml ]]; then
+    echo "Keeping existing .pre-commit-config.yaml (left untouched)."
+  else
+    tmp="$(mktemp)"
+    if curl -fsSL "${BASE}/precommit/${PRECOMMIT}.yaml" -o "$tmp"; then
+      mv "$tmp" .pre-commit-config.yaml
+      echo "Installed .pre-commit-config.yaml (precommit=${PRECOMMIT})."
+    else
+      rm -f "$tmp"
+      echo "Unknown precommit template '${PRECOMMIT}'." >&2
+      echo "Valid: base, terraform, go, ansible, none." >&2
+      exit 1
+    fi
+  fi
 fi
 
 echo "Initialized methridge/taskfiles @ ${REF}. Run: task --list-all"
