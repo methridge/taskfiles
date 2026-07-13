@@ -42,6 +42,37 @@ curl -fsSL https://github.com/methridge/taskfiles/releases/download/v1.0.0/init.
 Commit the resulting `.taskfiles/` into your repo (it is vendored, not ignored),
 then put your project-specific tasks in `.taskfiles/project/project.yml`.
 
+### Pre-commit config
+
+`init.sh` also installs a `.pre-commit-config.yaml` from `precommit/`. Pick a
+template with a `precommit=NAME` token (default `base`); use `precommit=none` to
+skip it. An existing `.pre-commit-config.yaml` is never overwritten.
+
+| Name | Hooks |
+| --- | --- |
+| `base` | pre-commit-hooks base set (large-files, merge-conflict, yaml, eof, no-commit-to-branch, trailing-whitespace) |
+| `terraform` | base + antonbabenko/pre-commit-terraform (fmt, validate, docs, tflint, trivy) |
+| `go` | base + golangci-lint |
+| `ansible` | base + ansible-lint |
+
+```bash
+# base pre-commit (default)
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash
+
+# terraform template
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest precommit=terraform
+
+# go tasks + go pre-commit (the token can sit alongside extra shared files)
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest go.yml precommit=go
+
+# no pre-commit config
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest precommit=none
+```
+
+Templates are complete standalone files (pre-commit has no include mechanism).
+`precommit/terraform.yaml` is the canonical terraform config; keep repo copies in
+sync with it.
+
 ## Refresh an already-adopted repo
 
 Check whether you're behind the latest release first:

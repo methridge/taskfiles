@@ -20,6 +20,11 @@ implementation is this repo.
   project layer use `optional: true` so a repo can omit what it does not use.
 - Project-specific tasks live in `.taskfiles/project/project.yml` (repo-owned;
   never synced).
+- Pre-commit config templates live in `precommit/` (`base`, `terraform`, `go`,
+  `ansible`); `init.sh` installs one via a `precommit=NAME` token. The
+  `.pre-commit-config.yaml` it drops is repo-owned (never synced), and
+  `precommit/terraform.yaml` is the canonical terraform config other repos should
+  match.
 
 ## Tasks
 
