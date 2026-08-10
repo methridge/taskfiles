@@ -142,6 +142,35 @@ else
   report "existing claude settings preserved" no
 fi
 
+# claude=terraform -> writes the .taskfiles/claude-profile marker containing
+# exactly "terraform"
+w="$(run claude=terraform)"
+if [[ -f "$w/.taskfiles/claude-profile" ]] \
+  && [[ "$(cat "$w/.taskfiles/claude-profile")" == "terraform" ]]; then
+  report "claude=terraform writes marker" ok
+else
+  report "claude=terraform writes marker" no
+fi
+
+# no claude token -> no marker written
+w="$(run)"
+if [[ ! -f "$w/.taskfiles/claude-profile" ]]; then
+  report "no claude token writes no marker" ok
+else
+  report "no claude token writes no marker" no
+fi
+
+# existing settings.json -> neither settings.json nor marker is (re)written
+work="$(mktemp -d)"
+mkdir -p "$work/.claude"
+printf '{"SENTINEL":true}\n' > "$work/.claude/settings.json"
+( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=terraform ) >/dev/null 2>&1
+if grep -q SENTINEL "$work/.claude/settings.json" && [[ ! -f "$work/.taskfiles/claude-profile" ]]; then
+  report "existing settings.json -> no marker written" ok
+else
+  report "existing settings.json -> no marker written" no
+fi
+
 echo "----"
 echo "pass=$pass fail=$fail"
 exit "$fail"
