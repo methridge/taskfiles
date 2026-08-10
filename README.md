@@ -73,6 +73,27 @@ Templates are complete standalone files (pre-commit has no include mechanism).
 `precommit/terraform.yaml` is the canonical terraform config; keep repo copies in
 sync with it.
 
+### Claude Code plugin profile
+
+`init.sh` can also install a `.claude/settings.json` from `claude/`, so the repo
+only loads the Claude Code plugins it needs. Unlike `precommit`, this is
+opt-in - pass a `claude=PROFILE` token to install one (there is no default). An
+existing `.claude/settings.json` is never overwritten.
+
+Valid profiles: `terraform`, `terraform-provider`, `packer`, `claude-config`.
+
+```bash
+# add a Claude Code plugin profile
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest claude=terraform
+
+# combine with a pre-commit template
+curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest precommit=terraform claude=terraform
+```
+
+Unlike the pre-commit template, this file stays managed after bootstrap: set
+`export CLAUDE_PROFILE="terraform"` in `.envrc` and `task sync` keeps
+`.claude/settings.json` current with the upstream profile.
+
 ## Refresh an already-adopted repo
 
 Check whether you're behind the latest release first:
