@@ -86,13 +86,21 @@ else
   report "existing config preserved" no
 fi
 
-# claude=terraform -> .claude/settings.json with the terraform plugins
+# claude=terraform -> .claude/settings.json with the terraform plugin
 w="$(run claude=terraform)"
 if [[ -f "$w/.claude/settings.json" ]] \
-  && grep -q terraform-module-generation "$w/.claude/settings.json"; then
+  && grep -q 'terraform@hashicorp' "$w/.claude/settings.json"; then
   report "claude=terraform installs profile" ok
 else
   report "claude=terraform installs profile" no
+fi
+
+# claude=terraform -> .mcp.json also installed, from claude/terraform.mcp.json
+w="$(run claude=terraform)"
+if [[ -f "$w/.mcp.json" ]] && grep -q terraform-mcp-server "$w/.mcp.json"; then
+  report "claude=terraform installs .mcp.json" ok
+else
+  report "claude=terraform installs .mcp.json" no
 fi
 
 # default (no token) -> no .claude/settings.json at all
@@ -115,10 +123,40 @@ fi
 w="$(run go.yml precommit=go claude=packer)"
 if [[ -f "$w/.taskfiles/shared/go.yml" ]] \
   && grep -q golangci-lint "$w/.pre-commit-config.yaml" \
-  && grep -q packer-builders "$w/.claude/settings.json"; then
+  && grep -q 'packer@hashicorp' "$w/.claude/settings.json"; then
   report "claude token composes with go.yml + precommit" ok
 else
   report "claude token composes with go.yml + precommit" no
+fi
+
+# claude=packer -> packer profile has no .mcp.json upstream, so none is
+# created, silently (no error, no warning)
+w="$(run claude=packer)"
+if [[ -f "$w/.claude/settings.json" ]] && [[ ! -f "$w/.mcp.json" ]]; then
+  report "claude=packer creates no .mcp.json" ok
+else
+  report "claude=packer creates no .mcp.json" no
+fi
+
+# existing .mcp.json is never clobbered, even for a profile that has its own
+# (claude=terraform ships .mcp.json upstream, but a pre-existing file wins)
+work="$(mktemp -d)"
+printf '{"mcpServers":{"sentinel":{}}}\n' > "$work/.mcp.json"
+( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=terraform ) >/dev/null 2>&1
+if grep -q sentinel "$work/.mcp.json"; then
+  report "existing .mcp.json preserved under claude=terraform" ok
+else
+  report "existing .mcp.json preserved under claude=terraform" no
+fi
+
+# existing .mcp.json is never clobbered for a profile with no .mcp.json either
+work="$(mktemp -d)"
+printf '{"mcpServers":{"sentinel":{}}}\n' > "$work/.mcp.json"
+( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=packer ) >/dev/null 2>&1
+if grep -q sentinel "$work/.mcp.json"; then
+  report "existing .mcp.json preserved under claude=packer" ok
+else
+  report "existing .mcp.json preserved under claude=packer" no
 fi
 
 # unknown profile -> non-zero exit, no leftover file

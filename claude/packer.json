@@ -5,7 +5,6 @@
     }
   },
   "enabledPlugins": {
-    "packer-builders@hashicorp": true,
-    "packer-hcp@hashicorp": true
+    "packer@hashicorp": true
   }
 }

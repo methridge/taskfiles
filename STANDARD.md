@@ -27,8 +27,8 @@ implementation is this repo.
   `.pre-commit-config.yaml` it drops is repo-owned (never synced), and
   `precommit/terraform.yaml` is the canonical terraform config other repos should
   match.
-- Claude Code plugin profiles live in `claude/` (`terraform`, `terraform-provider`,
-  `packer`, `claude-config`); `init.sh` installs one via a `claude=PROFILE` token.
+- Claude Code plugin profiles live in `claude/` (`terraform`, `packer`,
+  `claude-config`); `init.sh` installs one via a `claude=PROFILE` token.
   Unlike `precommit`, this is opt-in (default `none`), and an existing
   `.claude/settings.json` is never overwritten. Where the two diverge is what
   happens next: the `.pre-commit-config.yaml` `init.sh` drops is repo-owned and
@@ -45,6 +45,31 @@ implementation is this repo.
   upstream on every run. That is the intended meaning of "sync-managed."
   Repos with no config entry and no env var behave as before: `sync` no-ops
   and the committed file stays frozen.
+  - The v1.5.0 profile set was `terraform`, `terraform-provider`, `packer`,
+    `terraform-provider-development`, `packer-builders`, `packer-hcp`
+    (mapping to six now-defunct upstream `hashicorp/agent-skills` plugins).
+    HashiCorp consolidated those six plugins into two (`terraform`, `packer`)
+    in v1.6.0; `terraform-provider` was deleted outright because the
+    consolidated `terraform` plugin already contains every provider skill it
+    used to enable separately, making the profile byte-identical to
+    `terraform`. It had zero consumers at deletion time.
+  - A profile may also ship a sibling `claude/<profile>.mcp.json` (shape
+    `{"mcpServers": {...}}`) for a project-scoped MCP server. Both `init.sh`
+    and `sync` fetch it alongside the profile's `.json` and, if present,
+    write it to `./.mcp.json` at the repo root - not under `.claude/`, which
+    is where Claude Code looks for project-scoped MCP config. Only `terraform`
+    has one today, restoring the Terraform registry MCP server the old
+    `terraform-module-generation` plugin bundled inline (the consolidated
+    plugins ship no MCP server at all). A missing `claude/<profile>.mcp.json`
+    (most profiles) is normal and silent, not an error - and in that case an
+    existing `./.mcp.json` is never overwritten or deleted, same as
+    `init.sh` never overwrites `.claude/settings.json`. When the profile
+    *does* have an `.mcp.json`, `task sync` treats it as sync-managed exactly
+    like `.claude/settings.json` - it is refreshed from upstream on every
+    run, overwriting a pre-existing `./.mcp.json`. `init.sh`, being
+    bootstrap-only, never overwrites an existing `.mcp.json` either way.
+    Switching a repo away from a profile with an `.mcp.json` leaves the old
+    file behind; remove it by hand.
 
 ## Repo config (`.taskfiles/config`)
 

@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 # original purpose). This is a floor, not a ceiling - every file matching
 # claude/*.json below is also validated, so a profile added later without
 # being added here is not silently skipped.
-required=(terraform terraform-provider packer claude-config)
+required=(terraform packer claude-config)
 fail=0
 for n in "${required[@]}"; do
   f="claude/${n}.json"
@@ -27,6 +27,10 @@ for f in claude/*.json; do
     fail=1
     continue
   fi
+  # Optional per-profile MCP server files (claude/<profile>.mcp.json) are a
+  # different shape ({"mcpServers": {...}}, no extraKnownMarketplaces or
+  # enabledPlugins) - validated separately below, not as a profile.
+  case "$f" in *.mcp.json) continue ;; esac
   if ! python3 -m json.tool "$f" >/dev/null 2>&1; then
     echo "INVALID JSON: $f"
     fail=1
@@ -68,4 +72,30 @@ PY
   fi
   echo "OK: $f"
 done
+
+# Optional per-profile MCP server files: well-formed JSON with a non-empty
+# mcpServers object. Not every profile has one - an empty glob match here is
+# not an error.
+shopt -s nullglob
+for f in claude/*.mcp.json; do
+  if ! python3 - "$f" <<'PY'
+import json, sys
+path = sys.argv[1]
+d = json.load(open(path))
+if not isinstance(d, dict) or "mcpServers" not in d:
+    print(f"{path}: missing mcpServers key")
+    sys.exit(1)
+if not isinstance(d["mcpServers"], dict) or not d["mcpServers"]:
+    print(f"{path}: mcpServers is not a non-empty object")
+    sys.exit(1)
+PY
+  then
+    echo "INVALID: $f"
+    fail=1
+    continue
+  fi
+  echo "OK: $f"
+done
+shopt -u nullglob
+
 exit "$fail"

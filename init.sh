@@ -123,8 +123,24 @@ if [[ "$CLAUDE_PROFILE" != "none" ]]; then
     else
       rm -f "$tmp"
       echo "Unknown claude profile '${CLAUDE_PROFILE}'." >&2
-      echo "Valid: terraform, terraform-provider, packer, claude-config, none." >&2
+      echo "Valid: terraform, packer, claude-config, none." >&2
       exit 1
+    fi
+  fi
+
+  # Optional per-profile MCP server (claude/<profile>.mcp.json upstream).
+  # Same never-clobber treatment as .claude/settings.json above: an existing
+  # ./.mcp.json is always kept. Most profiles have no .mcp.json at all - a
+  # fetch failure there is normal and silent, not an error.
+  if [[ -f .mcp.json ]]; then
+    echo "Keeping existing .mcp.json (left untouched)."
+  else
+    mcp_tmp="$(mktemp)"
+    if curl -fsSL "${BASE}/claude/${CLAUDE_PROFILE}.mcp.json" -o "$mcp_tmp" 2>/dev/null; then
+      mv "$mcp_tmp" .mcp.json
+      echo "Installed .mcp.json (claude=${CLAUDE_PROFILE})."
+    else
+      rm -f "$mcp_tmp"
     fi
   fi
 fi
