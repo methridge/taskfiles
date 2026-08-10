@@ -16,7 +16,7 @@ Taskfile.yaml                 # generic root — identical in every consumer rep
     git.yml                   # merge / pre / push / review / tag* workflow
     go.yml                    # Go build/run/mod tasks (optional)
     ansible.yml               # Ansible playbook task (optional)
-    scripts/                  # lib.sh, merge.sh, review.sh (backing git.yml)
+    scripts/                  # lib.sh, merge.sh, push.sh, review.sh (backing git.yml)
   project/
     project.yml               # repo-owned tasks (never synced)
   config                       # committed repo config (optional; see below)
@@ -243,13 +243,45 @@ you). See [`example.envrc`](example.envrc) for the `.envrc` template.
 | `merge` (aliases `mr`, `pr`) | Open a PR (GitHub) or MR (GitLab) for the current branch, wait for checks, merge with a real merge commit, clean up. Auto-detects the host. |
 | `review:<PR#>` | Show a GitHub PR (metadata, checks, diff), then optionally approve and merge. |
 | `pre` | `pre-commit autoupdate` + `gc` + `run -a`. |
-| `push` | Branch off `main` (if needed), commit all changes, push. Commit message defaults to `chore: <timestamp>`; override with `task push MESSAGE="feat: add thing"`. Must be a valid Conventional Commit. |
+| `push` | Branch off `main` (if needed), stage changes, commit, push. Commit message defaults to `chore: <timestamp>`; override with `task push MESSAGE="feat: add thing"`. Must be a valid Conventional Commit. |
 | `tag:<v>` / `tag:<v>:<msg>` | Create a signed tag. |
 | `tag0` | Create the first tag (`v0.0.0`). |
 | `tagauto` | Signed tag with auto semantic version (`autotag`, conventional scheme). |
 | `tagcal` | Signed tag with calendar version. |
 
 See [STANDARD.md](STANDARD.md) for the conventions every Taskfile follows.
+
+### `push` in detail
+
+**Branch naming.** When run on `main`, `push` derives a branch name from
+`MESSAGE` instead of using a raw timestamp: `<type>/<slug>`, where `type` is
+the Conventional Commit type (scope and `!` are dropped) and `slug` is the
+description lowercased, with runs of non-alphanumeric characters collapsed to
+a single hyphen, trimmed, and capped at 40 characters. For example,
+`fix(auth)!: handle expiry` produces `fix/handle-expiry`. If the description
+sanitizes to nothing (e.g. `chore: ---`), the timestamp is used as the slug
+instead so a valid ref is always produced. If the resulting name already
+exists locally or on `origin`, a numeric suffix (`-2`, `-3`, ...) is appended
+until a free name is found - `push` never fails on a name collision or
+silently reuses another branch's history. Set `BRANCH="my/name"` to override
+the derived name entirely (used verbatim, no collision handling). Running
+`push` from an existing non-`main` branch never creates a new branch.
+
+**Staging safety.** `push` no longer runs a bare `git add .`. By default
+(`FILES="."`) it stages everything *except* it first checks for new
+untracked files (respecting `.gitignore`). If there are none, it proceeds
+with no friction - editing already-tracked files stays exactly as
+frictionless as before. If there are new untracked files, `push` fails
+before staging anything, lists them, and tells you to either re-run with
+`ALLOW_UNTRACKED=true` to include them or pass `FILES="path/a path/b"` to
+stage specific paths instead (which bypasses the untracked check for those
+explicit paths).
+
+> [!NOTE]
+> Both behaviors changed in v1.6.2: branches on `main` now name after
+> `<type>/<slug>` instead of a timestamp, and `push` will refuse to stage
+> brand-new untracked files unless you opt in. See the [v1.6.2
+> release](https://github.com/methridge/taskfiles/releases/tag/v1.6.2) notes.
 
 ## Cutting a release (maintainers)
 
