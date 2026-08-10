@@ -13,8 +13,10 @@ implementation is this repo.
   ```
 
 - `version: "3"` (double-quoted).
-- The root `Taskfile.yaml` is generic and identical across repos. It only wires
-  includes and defines `default` + `sync`. It carries no project-specific tasks.
+- The root `Taskfile.yaml` is generic and identical across repos. It wires
+  includes and defines generic, repo-agnostic tasks: `default`, `sync`,
+  `sync:check`, and `claude:*` (see below). It carries no project-specific
+  tasks - those live in `.taskfiles/project/project.yml` instead.
 - Shared task content is vendored into `.taskfiles/shared/` and included by
   relative path. Optional shared files (`go.yml`, `ansible.yml`) and the
   project layer use `optional: true` so a repo can omit what it does not use.
@@ -98,6 +100,53 @@ left out entirely, so the file never claims a choice this run didn't make.
 If `.taskfiles/config` already exists, `init.sh` leaves it alone and says so,
 matching how it already refuses to clobber `.taskfiles/project/project.yml`
 and `.pre-commit-config.yaml`.
+
+### CLI-override warnings
+
+A CLI arg to `sync` (e.g. `task sync TASKFILES_CLAUDE_PROFILE=packer`) is
+always one-off - `sync` never writes it back to `.taskfiles/config`. Left
+silent, that one-off nature is easy to miss, and there is a worse variant: a
+CLI arg in a repo with **no** recorded profile produces a correct
+`.claude/settings.json` once and then never again, because every later bare
+`sync` has nothing to resolve to. That is the exact staleness bug
+`.taskfiles/config` exists to prevent, re-entered through the CLI-arg door.
+`sync` therefore prints a warning to stderr in exactly two cases, both only
+when `TASKFILES_CLAUDE_PROFILE` came from a CLI arg:
+
+- The CLI value differs from what `.taskfiles/config` records: the override
+  is for this run only, `.taskfiles/config` is unchanged, and the next bare
+  `sync` reverts to the recorded value.
+- `.taskfiles/config` records no profile at all: nothing will maintain
+  `.claude/settings.json` going forward, and the file will stay frozen at
+  whatever this run wrote unless `TASKFILES_CLAUDE_PROFILE` is recorded.
+
+The normal path - the profile coming from `.taskfiles/config` itself, with no
+CLI arg - stays silent; warning on the intended, everyday path would just
+train people to ignore warnings.
+
+Distinguishing "value came from a CLI arg" from "value came from
+`.taskfiles/config`" (verified on Task 3.50.0): a CLI-passed `VAR=value`
+populates the resolved template var (`{{.TASKFILES_CLAUDE_PROFILE}}`) but is
+**not** exported into the shell environment `cmds:` scripts run in - Task
+keeps CLI/call vars and the process environment as separate channels. A
+value from `dotenv:` (`.taskfiles/config`) or an ambient env var, by
+contrast, **is** visible as a real shell variable there. So a mismatch
+between the resolved template var and the plain shell variable of the same
+name means a CLI arg won. What `.taskfiles/config` itself records is read
+directly from the file (not through Task's var resolution at all), so
+ambient-env noise can never taint that comparison.
+
+### `claude:*` - record a profile without drift
+
+`task claude:<profile>` (e.g. `task claude:terraform`) is the safe way to
+change a repo's Claude Code profile: it validates the name resolves upstream,
+updates (or creates) `.taskfiles/config` - preserving every other key and
+comment, touching only the `TASKFILES_CLAUDE_PROFILE` line - and then runs
+`sync`, so `.taskfiles/config` and `.claude/settings.json` can never drift
+apart. It follows this repo's existing `<verb>:*` wildcard idiom
+(`tag:*`, `review:*`, `release:*`). Prefer it over a bare
+`task sync TASKFILES_CLAUDE_PROFILE=...`, which is intentionally one-off (see
+above).
 
 ## Tasks
 

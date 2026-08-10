@@ -112,6 +112,21 @@ run, with no environment variable needed. Set
 `export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` only when you need
 to override the committed config for that checkout.
 
+### Changing the profile safely
+
+Prefer `task claude:<profile>` (e.g. `task claude:terraform`) over passing
+`TASKFILES_CLAUDE_PROFILE` on the `sync` CLI directly. It validates the name
+resolves upstream, updates `.taskfiles/config` - preserving every other key
+and comment - and syncs in one step, so the config and
+`.claude/settings.json` can never drift apart. A bare `task sync
+TASKFILES_CLAUDE_PROFILE=...` is intentionally one-off: it is never written
+back to `.taskfiles/config`, and `sync` warns on stderr when it detects the
+value came from a CLI arg - either the config already records a different
+profile (the override applies to this run only), or there is no recorded
+profile at all (the dangerous case - nothing will refresh
+`.claude/settings.json` on a later bare sync until one is recorded). Normal
+syncs, where the profile comes from `.taskfiles/config` itself, stay silent.
+
 ## Repo config (`.taskfiles/config`)
 
 `.taskfiles/config` is an optional, committed, plain `KEY="value"` file the
