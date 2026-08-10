@@ -23,15 +23,25 @@ for n in "${names[@]}"; do
   fi
   if ! python3 - "$f" <<'PY'
 import json, sys
-d = json.load(open(sys.argv[1]))
+path = sys.argv[1]
+d = json.load(open(path))
+if not isinstance(d, dict):
+    print(f"{path}: profile is not a JSON object")
+    sys.exit(1)
 missing = [k for k in ("extraKnownMarketplaces", "enabledPlugins") if k not in d]
 if missing:
     print("missing keys: " + ", ".join(missing))
     sys.exit(1)
+if not isinstance(d["enabledPlugins"], dict):
+    print(f"{path}: enabledPlugins is not a JSON object")
+    sys.exit(1)
 if not d["enabledPlugins"]:
     print("enabledPlugins is empty")
     sys.exit(1)
-for name in d["enabledPlugins"]:
+for name, enabled in d["enabledPlugins"].items():
+    if enabled is not True:
+        print(f"{path}: enabledPlugins[{name}] is not true")
+        sys.exit(1)
     if "@" not in name:
         print(f"plugin key not marketplace-qualified: {name}")
         sys.exit(1)
