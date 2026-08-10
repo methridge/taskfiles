@@ -32,17 +32,30 @@ implementation is this repo.
   happens next: the `.pre-commit-config.yaml` `init.sh` drops is repo-owned and
   `sync` never touches it again, but the `.claude/settings.json` it writes **is**
   sync-managed - `task sync` refreshes it from `claude/<name>.json` upstream
-  whenever `TASKFILES_CLAUDE_PROFILE` is set. Propagation is conditional, not
-  automatic: a change to a profile reaches a repo only if that repo has
-  `export TASKFILES_CLAUDE_PROFILE=<name>` set in its own environment
-  (typically via its gitignored `.envrc`) at the moment `task sync` runs there.
-  Nothing in-repo records which profile a repo uses - a fresh clone with no
-  `.envrc` (or anyone else's checkout without that export) has
-  `TASKFILES_CLAUDE_PROFILE` unset, so `sync` no-ops forever and the committed
-  `.claude/settings.json` stays frozen at whatever was last generated. That
-  committed file is what a fresh clone actually reads; `sync` no-ops when
-  `TASKFILES_CLAUDE_PROFILE` is unset or empty, so a bare `task sync` never
-  touches the committed file.
+  whenever a profile is selected. When `init.sh` installs a profile it also
+  writes `.taskfiles/claude-profile`, a committed one-line marker naming that
+  profile, so the choice travels with the repo instead of living only in a
+  gitignored `.envrc`.
+  `sync` resolves which profile to use in this order: (1) `TASKFILES_CLAUDE_PROFILE`,
+  if set and non-empty, always wins - a one-off override still works; (2)
+  otherwise, the committed `.taskfiles/claude-profile` marker, if it exists and
+  contains a non-empty name (surrounding whitespace and the trailing newline
+  are trimmed; a whitespace-only file counts as empty); (3) otherwise, neither
+  is set and `sync` does nothing to `.claude/settings.json` - this no-op is a
+  safety property. `sync` only ever reads the marker, never writes it, so it
+  cannot clobber it. A marker (or an explicit var) naming a profile that does
+  not exist in `claude/` fails loudly and leaves `.claude/settings.json`
+  untouched, the same as today.
+  **Behavioural change from pre-marker repos:** before the marker existed, a
+  bare `task sync` in a repo with a committed `.claude/settings.json` but no
+  `TASKFILES_CLAUDE_PROFILE` set left that file alone forever - propagation
+  required the variable to be set in that repo's own environment. Now, a
+  repo bootstrapped with `claude=PROFILE` carries its own marker, so a bare
+  `task sync` with no environment variable set will refresh
+  `.claude/settings.json` from `claude/<name>.json` upstream on every run.
+  That is the intended meaning of "sync-managed" - it just was not reachable
+  without the marker before. Repos with no marker and no var behave exactly
+  as before: `sync` no-ops and the committed file stays frozen.
 
 ## Tasks
 

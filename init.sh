@@ -111,6 +111,9 @@ if [[ "$CLAUDE_PROFILE" != "none" ]]; then
       mkdir -p .claude
       mv "$tmp" .claude/settings.json
       echo "Installed .claude/settings.json (claude=${CLAUDE_PROFILE})."
+      mkdir -p .taskfiles
+      printf '%s\n' "$CLAUDE_PROFILE" > .taskfiles/claude-profile
+      echo "Wrote .taskfiles/claude-profile (claude=${CLAUDE_PROFILE})."
     else
       rm -f "$tmp"
       echo "Unknown claude profile '${CLAUDE_PROFILE}'." >&2
