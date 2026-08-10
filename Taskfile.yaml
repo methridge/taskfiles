@@ -46,7 +46,7 @@ tasks:
       # Empty = leave .claude/settings.json alone, so a bare `task sync` in a
       # fresh clone never wipes the committed file. Set durably in .envrc.
       CLAUDE_PROFILE: '{{.CLAUDE_PROFILE | default ""}}'
-      BASE: 'https://raw.githubusercontent.com/methridge/taskfiles/{{.TASKFILES_REF}}'
+      BASE: '{{.BASE | default (print "https://raw.githubusercontent.com/methridge/taskfiles/" .TASKFILES_REF)}}'
     cmds:
       # Generic root — safe to overwrite; project tasks live in .taskfiles/project/.
       - curl -fsSL "{{.BASE}}/Taskfile.yaml" -o Taskfile.yaml
