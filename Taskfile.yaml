@@ -9,6 +9,13 @@
 
 version: "3"
 
+# .taskfiles/config is an optional, committed, repo-owned record of choices
+# init.sh made for this repo (which shared files it vendors, which Claude Code
+# profile, which precommit template). A missing file is not an error - Task's
+# built-in defaults apply. See STANDARD.md and example.envrc for the resolution
+# order and why a committed file deliberately outranks a stray ambient env var.
+dotenv: [".taskfiles/config"]
+
 includes:
   git:
     taskfile: .taskfiles/shared/git.yml
@@ -43,10 +50,11 @@ tasks:
       TASKFILES_REF: '{{.TASKFILES_REF | default "v1.3.0"}}'
       TASKFILES_FILES: '{{.TASKFILES_FILES | default "git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"}}'
       # Claude Code plugin profile for this repo (claude/<name>.json upstream).
-      # Resolution order: TASKFILES_CLAUDE_PROFILE (explicit var, always wins)
-      # -> committed .taskfiles/claude-profile marker -> neither set, no-op.
-      # Empty/unset here falls through to the marker file below; see the sync
-      # command body for the full resolution logic.
+      # Resolution order, high to low: a CLI arg (TASKFILES_CLAUDE_PROFILE=...)
+      # -> the value from .taskfiles/config, if present (loaded above via
+      # `dotenv:`) -> an ambient environment variable -> empty (no-op). Task's
+      # own var/env/default precedence gives us this for free; no marker file
+      # to read here anymore.
       TASKFILES_CLAUDE_PROFILE: '{{.TASKFILES_CLAUDE_PROFILE | default ""}}'
       TASKFILES_BASE: '{{.TASKFILES_BASE | default (print "https://raw.githubusercontent.com/methridge/taskfiles/" .TASKFILES_REF)}}'
     cmds:
@@ -58,14 +66,8 @@ tasks:
           curl -fsSL "{{.TASKFILES_BASE}}/.taskfiles/shared/{{.ITEM}}" -o ".taskfiles/shared/{{.ITEM}}"
           case "{{.ITEM}}" in *.sh) chmod +x ".taskfiles/shared/{{.ITEM}}" ;; esac
       - |
-        # Resolution order: explicit TASKFILES_CLAUDE_PROFILE always wins; else
-        # fall back to the committed .taskfiles/claude-profile marker (trimmed
-        # of surrounding whitespace/newline); else no-op. This task only reads
-        # the marker, never writes it, so it can never clobber it.
+        # See the TASKFILES_CLAUDE_PROFILE var above for the resolution order.
         profile="{{.TASKFILES_CLAUDE_PROFILE}}"
-        if [ -z "$profile" ] && [ -f .taskfiles/claude-profile ]; then
-          profile="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' .taskfiles/claude-profile | head -n1)"
-        fi
         if [ -n "$profile" ]; then
           mkdir -p .claude
           tmp="$(mktemp)"

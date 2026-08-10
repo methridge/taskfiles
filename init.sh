@@ -2,8 +2,10 @@
 #
 # Bootstrap a repo onto the methridge/taskfiles standard: lay down the generic
 # root Taskfile.yaml, the shared task files + scripts under .taskfiles/shared/,
-# and a .taskfiles/project/project.yml stub. Idempotent — never clobbers an
-# existing project.yml.
+# a .taskfiles/project/project.yml stub, and a committed .taskfiles/config
+# recording what was vendored/installed. Idempotent - never clobbers an
+# existing project.yml, .pre-commit-config.yaml, .claude/settings.json, or
+# .taskfiles/config.
 #
 # Usage (served from the latest GitHub Release):
 #   curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh \
@@ -48,6 +50,11 @@ BASE="${TASKFILES_BASE:-https://raw.githubusercontent.com/methridge/taskfiles/${
 # base template (`none` opts out); claude is opt-in and defaults to `none`.
 PRECOMMIT="base"
 CLAUDE_PROFILE="none"
+# Track what this invocation actually did (not just what was requested), so
+# the .taskfiles/config we write at the end never claims something skipped
+# because a file already existed.
+PRECOMMIT_INSTALLED=""
+CLAUDE_PROFILE_INSTALLED=""
 REST=()
 for a in "$@"; do
   case "$a" in
@@ -93,6 +100,7 @@ if [[ "$PRECOMMIT" != "none" ]]; then
     if curl -fsSL "${BASE}/precommit/${PRECOMMIT}.yaml" -o "$tmp"; then
       mv "$tmp" .pre-commit-config.yaml
       echo "Installed .pre-commit-config.yaml (precommit=${PRECOMMIT})."
+      PRECOMMIT_INSTALLED="$PRECOMMIT"
     else
       rm -f "$tmp"
       echo "Unknown precommit template '${PRECOMMIT}'." >&2
@@ -111,9 +119,7 @@ if [[ "$CLAUDE_PROFILE" != "none" ]]; then
       mkdir -p .claude
       mv "$tmp" .claude/settings.json
       echo "Installed .claude/settings.json (claude=${CLAUDE_PROFILE})."
-      mkdir -p .taskfiles
-      printf '%s\n' "$CLAUDE_PROFILE" > .taskfiles/claude-profile
-      echo "Wrote .taskfiles/claude-profile (claude=${CLAUDE_PROFILE})."
+      CLAUDE_PROFILE_INSTALLED="$CLAUDE_PROFILE"
     else
       rm -f "$tmp"
       echo "Unknown claude profile '${CLAUDE_PROFILE}'." >&2
@@ -121,6 +127,35 @@ if [[ "$CLAUDE_PROFILE" != "none" ]]; then
       exit 1
     fi
   fi
+fi
+
+# .taskfiles/config is the committed record of the choices this bootstrap
+# made (superset of the old .taskfiles/claude-profile marker, removed in
+# v1.4.0). Only record what this invocation actually did: if an existing
+# .claude/settings.json or .pre-commit-config.yaml was left untouched above,
+# CLAUDE_PROFILE_INSTALLED / PRECOMMIT_INSTALLED stay empty, so we never
+# claim credit for a file we didn't write. TASKFILES_REF is deliberately not
+# recorded here - it is already stamped into Taskfile.yaml's sync default by
+# `task release`; a second copy could disagree with the authoritative one.
+if [[ -f .taskfiles/config ]]; then
+  echo "Keeping existing .taskfiles/config (left untouched)."
+else
+  mkdir -p .taskfiles
+  {
+    echo "# Committed methridge/taskfiles config for this repo (see STANDARD.md)."
+    echo "# Loaded by the root Taskfile's \`dotenv:\` directive."
+    printf 'TASKFILES_FILES="%s"\n' "${SHARED[*]}"
+    if [[ -n "$CLAUDE_PROFILE_INSTALLED" ]]; then
+      printf 'TASKFILES_CLAUDE_PROFILE="%s"\n' "$CLAUDE_PROFILE_INSTALLED"
+    fi
+    if [[ -n "$PRECOMMIT_INSTALLED" ]]; then
+      # Record only - PRECOMMIT names the template that seeded
+      # .pre-commit-config.yaml. That file is repo-owned and hand-tunable;
+      # `task sync` never reads this key or touches the file again.
+      printf 'PRECOMMIT="%s"\n' "$PRECOMMIT_INSTALLED"
+    fi
+  } > .taskfiles/config
+  echo "Wrote .taskfiles/config."
 fi
 
 echo "Initialized methridge/taskfiles @ ${REF}. Run: task --list-all"

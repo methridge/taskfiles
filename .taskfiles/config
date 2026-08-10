@@ -1,0 +1,4 @@
+# Committed methridge/taskfiles config for this repo (see STANDARD.md).
+# Loaded by the root Taskfile's `dotenv:` directive.
+TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh go.yml ansible.yml"
+PRECOMMIT="base"
