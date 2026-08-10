@@ -42,6 +42,10 @@ tasks:
     vars:
       TASKFILES_REF: '{{.TASKFILES_REF | default "v1.1.0"}}'
       TASKFILES_FILES: '{{.TASKFILES_FILES | default "git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"}}'
+      # Claude Code plugin profile for this repo (claude/<name>.json upstream).
+      # Empty = leave .claude/settings.json alone, so a bare `task sync` in a
+      # fresh clone never wipes the committed file. Set durably in .envrc.
+      CLAUDE_PROFILE: '{{.CLAUDE_PROFILE | default ""}}'
       BASE: 'https://raw.githubusercontent.com/methridge/taskfiles/{{.TASKFILES_REF}}'
     cmds:
       # Generic root — safe to overwrite; project tasks live in .taskfiles/project/.
@@ -51,6 +55,12 @@ tasks:
           mkdir -p ".taskfiles/shared/$(dirname "{{.ITEM}}")"
           curl -fsSL "{{.BASE}}/.taskfiles/shared/{{.ITEM}}" -o ".taskfiles/shared/{{.ITEM}}"
           case "{{.ITEM}}" in *.sh) chmod +x ".taskfiles/shared/{{.ITEM}}" ;; esac
+      - |
+        if [ -n "{{.CLAUDE_PROFILE}}" ]; then
+          mkdir -p .claude
+          curl -fsSL "{{.BASE}}/claude/{{.CLAUDE_PROFILE}}.json" -o .claude/settings.json
+          echo "Synced .claude/settings.json (CLAUDE_PROFILE={{.CLAUDE_PROFILE}})."
+        fi
 
   sync:check:
     desc: Report whether a newer methridge/taskfiles release is available
