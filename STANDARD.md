@@ -25,6 +25,18 @@ implementation is this repo.
   `.pre-commit-config.yaml` it drops is repo-owned (never synced), and
   `precommit/terraform.yaml` is the canonical terraform config other repos should
   match.
+- Claude Code plugin profiles live in `claude/` (`terraform`, `terraform-provider`,
+  `packer`, `claude-config`); `init.sh` installs one via a `claude=PROFILE` token.
+  Unlike `precommit`, this is opt-in (default `none`), and an existing
+  `.claude/settings.json` is never overwritten. Where the two diverge is what
+  happens next: the `.pre-commit-config.yaml` `init.sh` drops is repo-owned and
+  `sync` never touches it again, but the `.claude/settings.json` it writes **is**
+  sync-managed - `task sync` refreshes it from `claude/<name>.json` upstream
+  whenever `CLAUDE_PROFILE` is set, so a change to a profile reaches every repo
+  that uses it on its next sync. The generated file is still committed and is
+  what a fresh clone reads; `CLAUDE_PROFILE` in `.envrc` only drives
+  regeneration. `sync` no-ops when `CLAUDE_PROFILE` is unset or empty, so a bare
+  `task sync` never touches the committed file.
 
 ## Tasks
 

@@ -1,0 +1,11 @@
+{
+  "extraKnownMarketplaces": {
+    "hashicorp": {
+      "source": { "source": "github", "repo": "hashicorp/agent-skills" }
+    }
+  },
+  "enabledPlugins": {
+    "packer-builders@hashicorp": true,
+    "packer-hcp@hashicorp": true
+  }
+}

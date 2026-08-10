@@ -86,6 +86,62 @@ else
   report "existing config preserved" no
 fi
 
+# claude=terraform -> .claude/settings.json with the terraform plugins
+w="$(run claude=terraform)"
+if [[ -f "$w/.claude/settings.json" ]] \
+  && grep -q terraform-module-generation "$w/.claude/settings.json"; then
+  report "claude=terraform installs profile" ok
+else
+  report "claude=terraform installs profile" no
+fi
+
+# default (no token) -> no .claude/settings.json at all
+w="$(run)"
+if [[ ! -f "$w/.claude/settings.json" ]]; then
+  report "claude defaults to opt-out" ok
+else
+  report "claude defaults to opt-out" no
+fi
+
+# claude=none -> explicit opt-out, same as default
+w="$(run claude=none)"
+if [[ ! -f "$w/.claude/settings.json" ]]; then
+  report "claude=none opts out" ok
+else
+  report "claude=none opts out" no
+fi
+
+# token combines with shared files and the precommit token
+w="$(run go.yml precommit=go claude=packer)"
+if [[ -f "$w/.taskfiles/shared/go.yml" ]] \
+  && grep -q golangci-lint "$w/.pre-commit-config.yaml" \
+  && grep -q packer-builders "$w/.claude/settings.json"; then
+  report "claude token composes with go.yml + precommit" ok
+else
+  report "claude token composes with go.yml + precommit" no
+fi
+
+# unknown profile -> non-zero exit, no leftover file
+work="$(mktemp -d)"
+if ( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=bogus ) >/dev/null 2>&1; then
+  report "unknown claude profile fails" no
+elif [[ ! -f "$work/.claude/settings.json" ]]; then
+  report "unknown claude profile fails cleanly" ok
+else
+  report "unknown claude profile leaves no file" no
+fi
+
+# existing settings.json is never clobbered
+work="$(mktemp -d)"
+mkdir -p "$work/.claude"
+printf '{"SENTINEL":true}\n' > "$work/.claude/settings.json"
+( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=terraform ) >/dev/null 2>&1
+if grep -q SENTINEL "$work/.claude/settings.json"; then
+  report "existing claude settings preserved" ok
+else
+  report "existing claude settings preserved" no
+fi
+
 echo "----"
 echo "pass=$pass fail=$fail"
 exit "$fail"
