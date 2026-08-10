@@ -68,6 +68,32 @@ tasks:
       - |
         # See the TASKFILES_CLAUDE_PROFILE var above for the resolution order.
         profile="{{.TASKFILES_CLAUDE_PROFILE}}"
+
+        # Warn (without changing behaviour) when profile came from a CLI arg
+        # rather than the committed .taskfiles/config, so a one-off override
+        # never masquerades as a durable choice. Detecting the source
+        # (verified on Task 3.50.0): a CLI-passed `VAR=value` only ever
+        # populates the resolved template var above ({{.TASKFILES_CLAUDE_PROFILE}})
+        # - Task does NOT export it into this script's shell environment. A
+        # value coming from `dotenv:` (.taskfiles/config) or an ambient env
+        # var, by contrast, IS visible here as a real shell variable. So if
+        # $TASKFILES_CLAUDE_PROFILE (this shell) differs from $profile (the
+        # resolved value), a CLI arg is what won. What .taskfiles/config
+        # itself records is read directly from the file, independent of
+        # either of those, so ambient-env noise never taints the comparison.
+        env_profile="${TASKFILES_CLAUDE_PROFILE:-}"
+        config_profile=""
+        if [ -f .taskfiles/config ]; then
+          config_profile="$(sed -nE 's/^TASKFILES_CLAUDE_PROFILE="(.*)"$/\1/p' .taskfiles/config | head -1)"
+        fi
+        if [ -n "$profile" ] && [ "$profile" != "$env_profile" ]; then
+          if [ -z "$config_profile" ]; then
+            echo "WARNING: TASKFILES_CLAUDE_PROFILE=${profile} was passed on the CLI, but .taskfiles/config has no TASKFILES_CLAUDE_PROFILE recorded. Nothing will maintain .claude/settings.json going forward - a later bare 'task sync' will NOT refresh it, and the file will stay frozen. Add TASKFILES_CLAUDE_PROFILE=\"${profile}\" to .taskfiles/config (or run 'task claude:${profile}') to fix this." >&2
+          elif [ "$config_profile" != "$profile" ]; then
+            echo "WARNING: TASKFILES_CLAUDE_PROFILE=${profile} was passed on the CLI; this override applies to this run only. .taskfiles/config still records TASKFILES_CLAUDE_PROFILE=\"${config_profile}\" and is unchanged - the next bare 'task sync' will use \"${config_profile}\" again." >&2
+          fi
+        fi
+
         if [ -n "$profile" ]; then
           mkdir -p .claude
           tmp="$(mktemp)"
