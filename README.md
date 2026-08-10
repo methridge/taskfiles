@@ -78,7 +78,9 @@ sync with it.
 `init.sh` can also install a `.claude/settings.json` from `claude/`, so the repo
 only loads the Claude Code plugins it needs. Unlike `precommit`, this is
 opt-in - pass a `claude=PROFILE` token to install one (there is no default). An
-existing `.claude/settings.json` is never overwritten.
+existing `.claude/settings.json` is never overwritten, and when one already
+exists `init.sh` also skips writing the marker described below (so the two
+never disagree about which profile - if any - is installed).
 
 Valid profiles: `terraform`, `terraform-provider`, `packer`, `claude-config`.
 
@@ -90,9 +92,24 @@ curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.
 curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.sh | bash -s -- latest precommit=terraform claude=terraform
 ```
 
-Unlike the pre-commit template, this file stays managed after bootstrap: set
-`export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` and `task sync` keeps
-`.claude/settings.json` current with the upstream profile.
+Unlike the pre-commit template, this file stays managed after bootstrap.
+Installing a profile also writes `.taskfiles/claude-profile`, a committed
+one-line marker naming the profile, so the choice is recorded in the repo
+instead of living only in a gitignored `.envrc`. `task sync` resolves which
+profile to use, in order: an explicit `TASKFILES_CLAUDE_PROFILE` env var (if
+set and non-empty, it always wins) - otherwise the committed
+`.taskfiles/claude-profile` marker - otherwise neither is set and
+`.claude/settings.json` is left alone. `sync` only reads the marker, never
+writes it.
+
+**Behavioural change:** previously, a bare `task sync` with no
+`TASKFILES_CLAUDE_PROFILE` set never touched a committed `.claude/settings.json`,
+even if the repo had bootstrapped with a profile - propagation required the
+variable to be set in that repo's own environment. Now that `init.sh` writes
+the marker, a bare `task sync` in such a repo refreshes `.claude/settings.json`
+from `claude/<name>.json` upstream on every run, with no environment variable
+needed. Set `export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` only when
+you need to override the committed marker for that checkout.
 
 ## Refresh an already-adopted repo
 
