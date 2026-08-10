@@ -13,8 +13,10 @@ implementation is this repo.
   ```
 
 - `version: "3"` (double-quoted).
-- The root `Taskfile.yaml` is generic and identical across repos. It only wires
-  includes and defines `default` + `sync`. It carries no project-specific tasks.
+- The root `Taskfile.yaml` is generic and identical across repos. It wires
+  includes and defines generic, repo-agnostic tasks: `default`, `sync`,
+  `sync:check`, and `claude:*` (see below). It carries no project-specific
+  tasks - those live in `.taskfiles/project/project.yml` instead.
 - Shared task content is vendored into `.taskfiles/shared/` and included by
   relative path. Optional shared files (`go.yml`, `ansible.yml`) and the
   project layer use `optional: true` so a repo can omit what it does not use.
@@ -133,6 +135,18 @@ between the resolved template var and the plain shell variable of the same
 name means a CLI arg won. What `.taskfiles/config` itself records is read
 directly from the file (not through Task's var resolution at all), so
 ambient-env noise can never taint that comparison.
+
+### `claude:*` - record a profile without drift
+
+`task claude:<profile>` (e.g. `task claude:terraform`) is the safe way to
+change a repo's Claude Code profile: it validates the name resolves upstream,
+updates (or creates) `.taskfiles/config` - preserving every other key and
+comment, touching only the `TASKFILES_CLAUDE_PROFILE` line - and then runs
+`sync`, so `.taskfiles/config` and `.claude/settings.json` can never drift
+apart. It follows this repo's existing `<verb>:*` wildcard idiom
+(`tag:*`, `review:*`, `release:*`). Prefer it over a bare
+`task sync TASKFILES_CLAUDE_PROFILE=...`, which is intentionally one-off (see
+above).
 
 ## Tasks
 

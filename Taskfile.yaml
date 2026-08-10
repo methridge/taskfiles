@@ -107,6 +107,57 @@ tasks:
           fi
         fi
 
+  claude:*:
+    desc: "Record a Claude Code profile in .taskfiles/config and sync (claude:<profile>, e.g. claude:terraform)"
+    vars:
+      PROFILE: "{{index .MATCH 0}}"
+      # Same resolution as `sync` above - kept in lockstep by `task release`,
+      # which stamps every `default "vX.Y.Z"` in this file together.
+      TASKFILES_REF: '{{.TASKFILES_REF | default "v1.4.0"}}'
+      TASKFILES_BASE: '{{.TASKFILES_BASE | default (print "https://raw.githubusercontent.com/methridge/taskfiles/" .TASKFILES_REF)}}'
+    cmds:
+      - |
+        profile="{{.PROFILE}}"
+
+        # Validate the name resolves upstream before writing anything - a
+        # bogus name recorded here would make every future bare `task sync`
+        # hard-fail fetching claude/<name>.json.
+        if ! curl -fsSL "{{.TASKFILES_BASE}}/claude/${profile}.json" -o /dev/null; then
+          echo "Unknown claude profile '${profile}' (no claude/${profile}.json at {{.TASKFILES_BASE}})." >&2
+          echo "Valid: terraform, terraform-provider, packer, claude-config." >&2
+          exit 1
+        fi
+
+        # Update .taskfiles/config, preserving every other key and comment -
+        # only ever touch the TASKFILES_CLAUDE_PROFILE line. Idempotent: a
+        # second run with the same profile rewrites the file to the same
+        # bytes.
+        if [ ! -f .taskfiles/config ]; then
+          mkdir -p .taskfiles
+          {
+            echo "# Committed methridge/taskfiles config for this repo (see STANDARD.md)."
+            echo "# Loaded by the root Taskfile's \`dotenv:\` directive."
+            printf 'TASKFILES_CLAUDE_PROFILE="%s"\n' "$profile"
+          } > .taskfiles/config
+          echo "Created .taskfiles/config (TASKFILES_CLAUDE_PROFILE=\"${profile}\")."
+        elif grep -q '^TASKFILES_CLAUDE_PROFILE=' .taskfiles/config; then
+          tmp="$(mktemp)"
+          sed -E "s|^TASKFILES_CLAUDE_PROFILE=.*|TASKFILES_CLAUDE_PROFILE=\"${profile}\"|" .taskfiles/config > "$tmp"
+          mv "$tmp" .taskfiles/config
+          echo "Updated .taskfiles/config (TASKFILES_CLAUDE_PROFILE=\"${profile}\")."
+        else
+          printf 'TASKFILES_CLAUDE_PROFILE="%s"\n' "$profile" >> .taskfiles/config
+          echo "Added TASKFILES_CLAUDE_PROFILE=\"${profile}\" to .taskfiles/config."
+        fi
+      # Pass the profile as a call var (same precedence tier as a CLI arg;
+      # verified on Task 3.50.0) so this sync uses the value just written
+      # even though dotenv was loaded before .taskfiles/config changed on
+      # disk - and since it now matches the freshly-written config, the
+      # CLI-override warning above correctly stays quiet.
+      - task: sync
+        vars:
+          TASKFILES_CLAUDE_PROFILE: "{{.PROFILE}}"
+
   sync:check:
     desc: Report whether a newer methridge/taskfiles release is available
     vars:
