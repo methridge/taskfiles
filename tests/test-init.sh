@@ -142,33 +142,95 @@ else
   report "existing claude settings preserved" no
 fi
 
-# claude=terraform -> writes the .taskfiles/claude-profile marker containing
-# exactly "terraform"
+# claude=terraform -> .taskfiles/config records TASKFILES_CLAUDE_PROFILE and
+# the default TASKFILES_FILES list
 w="$(run claude=terraform)"
-if [[ -f "$w/.taskfiles/claude-profile" ]] \
-  && [[ "$(cat "$w/.taskfiles/claude-profile")" == "terraform" ]]; then
-  report "claude=terraform writes marker" ok
+if [[ -f "$w/.taskfiles/config" ]] \
+  && grep -q 'TASKFILES_CLAUDE_PROFILE="terraform"' "$w/.taskfiles/config" \
+  && grep -q 'TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"' "$w/.taskfiles/config"; then
+  report "claude=terraform records profile in config" ok
 else
-  report "claude=terraform writes marker" no
+  report "claude=terraform records profile in config" no
 fi
 
-# no claude token -> no marker written
+# no claude token -> config written, but no TASKFILES_CLAUDE_PROFILE key
 w="$(run)"
-if [[ ! -f "$w/.taskfiles/claude-profile" ]]; then
-  report "no claude token writes no marker" ok
+if [[ -f "$w/.taskfiles/config" ]] && ! grep -q TASKFILES_CLAUDE_PROFILE "$w/.taskfiles/config"; then
+  report "no claude token records no profile" ok
 else
-  report "no claude token writes no marker" no
+  report "no claude token records no profile" no
 fi
 
-# existing settings.json -> neither settings.json nor marker is (re)written
+# existing settings.json -> declined install, so config must not claim that
+# profile (consistency rule: never record what this invocation didn't do)
 work="$(mktemp -d)"
 mkdir -p "$work/.claude"
 printf '{"SENTINEL":true}\n' > "$work/.claude/settings.json"
 ( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=terraform ) >/dev/null 2>&1
-if grep -q SENTINEL "$work/.claude/settings.json" && [[ ! -f "$work/.taskfiles/claude-profile" ]]; then
-  report "existing settings.json -> no marker written" ok
+if grep -q SENTINEL "$work/.claude/settings.json" \
+  && [[ -f "$work/.taskfiles/config" ]] \
+  && ! grep -q TASKFILES_CLAUDE_PROFILE "$work/.taskfiles/config"; then
+  report "existing settings.json -> config does not claim profile" ok
 else
-  report "existing settings.json -> no marker written" no
+  report "existing settings.json -> config does not claim profile" no
+fi
+
+# precommit=terraform -> config records PRECOMMIT
+w="$(run precommit=terraform)"
+if grep -q 'PRECOMMIT="terraform"' "$w/.taskfiles/config" 2>/dev/null; then
+  report "precommit=terraform records PRECOMMIT in config" ok
+else
+  report "precommit=terraform records PRECOMMIT in config" no
+fi
+
+# precommit=none -> no PRECOMMIT key
+w="$(run precommit=none)"
+if [[ -f "$w/.taskfiles/config" ]] && ! grep -q PRECOMMIT "$w/.taskfiles/config"; then
+  report "precommit=none records no PRECOMMIT" ok
+else
+  report "precommit=none records no PRECOMMIT" no
+fi
+
+# existing .pre-commit-config.yaml -> declined install, config must not claim
+# a PRECOMMIT template it didn't seed
+work="$(mktemp -d)"
+printf 'SENTINEL\n' > "$work/.pre-commit-config.yaml"
+( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 precommit=terraform ) >/dev/null 2>&1
+if grep -q SENTINEL "$work/.pre-commit-config.yaml" \
+  && [[ -f "$work/.taskfiles/config" ]] \
+  && ! grep -q PRECOMMIT "$work/.taskfiles/config"; then
+  report "existing pre-commit config -> config does not claim PRECOMMIT" ok
+else
+  report "existing pre-commit config -> config does not claim PRECOMMIT" no
+fi
+
+# extra shared files (go.yml) land in TASKFILES_FILES
+w="$(run go.yml)"
+if grep -q 'TASKFILES_FILES=".*go\.yml"' "$w/.taskfiles/config" 2>/dev/null; then
+  report "extra shared file recorded in TASKFILES_FILES" ok
+else
+  report "extra shared file recorded in TASKFILES_FILES" no
+fi
+
+# combined: go.yml + precommit=go + claude=packer -> all three keys present
+w="$(run go.yml precommit=go claude=packer)"
+if grep -q 'TASKFILES_FILES=".*go\.yml"' "$w/.taskfiles/config" 2>/dev/null \
+  && grep -q 'PRECOMMIT="go"' "$w/.taskfiles/config" 2>/dev/null \
+  && grep -q 'TASKFILES_CLAUDE_PROFILE="packer"' "$w/.taskfiles/config" 2>/dev/null; then
+  report "config records all three keys together" ok
+else
+  report "config records all three keys together" no
+fi
+
+# pre-existing .taskfiles/config is never clobbered
+work="$(mktemp -d)"
+mkdir -p "$work/.taskfiles"
+printf 'SENTINEL\n' > "$work/.taskfiles/config"
+( cd "$work" && TASKFILES_BASE="$BASE" bash "$INIT" v1.0.0 claude=terraform precommit=go ) >/dev/null 2>&1
+if grep -q SENTINEL "$work/.taskfiles/config"; then
+  report "existing .taskfiles/config preserved" ok
+else
+  report "existing .taskfiles/config preserved" no
 fi
 
 echo "----"

@@ -32,30 +32,72 @@ implementation is this repo.
   happens next: the `.pre-commit-config.yaml` `init.sh` drops is repo-owned and
   `sync` never touches it again, but the `.claude/settings.json` it writes **is**
   sync-managed - `task sync` refreshes it from `claude/<name>.json` upstream
-  whenever a profile is selected. When `init.sh` installs a profile it also
-  writes `.taskfiles/claude-profile`, a committed one-line marker naming that
-  profile, so the choice travels with the repo instead of living only in a
-  gitignored `.envrc`.
-  `sync` resolves which profile to use in this order: (1) `TASKFILES_CLAUDE_PROFILE`,
-  if set and non-empty, always wins - a one-off override still works; (2)
-  otherwise, the committed `.taskfiles/claude-profile` marker, if it exists and
-  contains a non-empty name (surrounding whitespace and the trailing newline
-  are trimmed; a whitespace-only file counts as empty); (3) otherwise, neither
-  is set and `sync` does nothing to `.claude/settings.json` - this no-op is a
-  safety property. `sync` only ever reads the marker, never writes it, so it
-  cannot clobber it. A marker (or an explicit var) naming a profile that does
-  not exist in `claude/` fails loudly and leaves `.claude/settings.json`
-  untouched, the same as today.
-  **Behavioural change from pre-marker repos:** before the marker existed, a
-  bare `task sync` in a repo with a committed `.claude/settings.json` but no
-  `TASKFILES_CLAUDE_PROFILE` set left that file alone forever - propagation
-  required the variable to be set in that repo's own environment. Now, a
-  repo bootstrapped with `claude=PROFILE` carries its own marker, so a bare
-  `task sync` with no environment variable set will refresh
-  `.claude/settings.json` from `claude/<name>.json` upstream on every run.
-  That is the intended meaning of "sync-managed" - it just was not reachable
-  without the marker before. Repos with no marker and no var behave exactly
-  as before: `sync` no-ops and the committed file stays frozen.
+  whenever a profile is selected (resolved via `.taskfiles/config`; see below).
+  **Behavioural change from profile-less repos:** a bare `task sync` in a repo
+  with a committed `.claude/settings.json` but no `TASKFILES_CLAUDE_PROFILE`
+  set and no `.taskfiles/config` entry leaves that file alone forever -
+  propagation requires either the config file or the env var. A repo
+  bootstrapped with `claude=PROFILE` gets `TASKFILES_CLAUDE_PROFILE` recorded
+  in its `.taskfiles/config`, so a bare `task sync` with no environment
+  variable set refreshes `.claude/settings.json` from `claude/<name>.json`
+  upstream on every run. That is the intended meaning of "sync-managed."
+  Repos with no config entry and no env var behave as before: `sync` no-ops
+  and the committed file stays frozen.
+
+## Repo config (`.taskfiles/config`)
+
+An optional, committed, plain `KEY="value"` file, loaded by the root
+Taskfile's `dotenv:` directive. It exists because `.envrc` is gitignored, so
+nothing in-repo previously recorded certain per-repo choices - a bare `task
+sync` would silently drift from what the repo actually needs (e.g. omit a
+vendored shared file, or skip refreshing the Claude profile) with no error
+and no signal. `.taskfiles/config` is generic machinery (loaded by the same
+`dotenv:` line in every consumer); its *contents* are repo-specific data, same
+as `.taskfiles/project/project.yml`. It supersedes the v1.3.0
+`.taskfiles/claude-profile` marker, which recorded only the Claude profile;
+that marker had zero consumers (no repo had synced to v1.3.0) and was removed
+outright rather than migrated.
+
+Keys recorded:
+
+- `TASKFILES_FILES` - which shared files this repo vendors (space-separated,
+  quoted: `TASKFILES_FILES="git.yml scripts/lib.sh go.yml"`).
+- `TASKFILES_CLAUDE_PROFILE` - the Claude Code profile, if one is installed.
+- `PRECOMMIT` - which `precommit/` template seeded `.pre-commit-config.yaml`.
+  **Recorded only - `sync` never reads or acts on this key.**
+  `.pre-commit-config.yaml` is repo-owned and hand-tunable per this document;
+  re-syncing it from the template would clobber local edits. `PRECOMMIT` is a
+  record of provenance (what seeded the file), not an instruction to `sync`.
+  Do not "fix" `sync` to honour it.
+
+`TASKFILES_REF` is deliberately **not** recorded here. It is already stamped
+into `Taskfile.yaml`'s `sync` default by `task release`; a second copy in
+`.taskfiles/config` could disagree with that authoritative one.
+
+**Resolution order**, high to low, for any var `.taskfiles/config` sets
+(verified against Task 3.50.0):
+
+1. A CLI arg, e.g. `task sync TASKFILES_FILES=...` - always wins, for a
+   one-off override.
+2. The value in `.taskfiles/config`, if the file exists and sets the key.
+3. An ambient environment variable (e.g. exported in a shell profile).
+4. The taskfile's built-in default.
+
+Critically, step 2 outranks step 3: a value committed in `.taskfiles/config`
+is **not** overridden by a same-named variable that merely happens to be
+exported in someone's shell. This is deliberate, not an oversight - it is the
+same hazard class the v1.2.1 `TASKFILES_`-prefix namespacing fixed (a stray
+ambient var silently steering `sync`), and a committed file that only a CLI
+arg can override is immune to it. A missing `.taskfiles/config` is not an
+error; step 3/4 apply as before.
+
+`init.sh` writes `.taskfiles/config` after bootstrapping, recording only what
+that invocation actually did - if it declined to overwrite an existing
+`.claude/settings.json` or `.pre-commit-config.yaml`, the corresponding key is
+left out entirely, so the file never claims a choice this run didn't make.
+If `.taskfiles/config` already exists, `init.sh` leaves it alone and says so,
+matching how it already refuses to clobber `.taskfiles/project/project.yml`
+and `.pre-commit-config.yaml`.
 
 ## Tasks
 

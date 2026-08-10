@@ -19,6 +19,7 @@ Taskfile.yaml                 # generic root — identical in every consumer rep
     scripts/                  # lib.sh, merge.sh, review.sh (backing git.yml)
   project/
     project.yml               # repo-owned tasks (never synced)
+  config                       # committed repo config (optional; see below)
 init.sh                       # one-time bootstrap for a repo with no Taskfile
 ```
 
@@ -79,8 +80,8 @@ sync with it.
 only loads the Claude Code plugins it needs. Unlike `precommit`, this is
 opt-in - pass a `claude=PROFILE` token to install one (there is no default). An
 existing `.claude/settings.json` is never overwritten, and when one already
-exists `init.sh` also skips writing the marker described below (so the two
-never disagree about which profile - if any - is installed).
+exists `init.sh` also skips recording the profile in `.taskfiles/config` (see
+below), so the two never disagree about which profile - if any - is installed.
 
 Valid profiles: `terraform`, `terraform-provider`, `packer`, `claude-config`.
 
@@ -93,23 +94,60 @@ curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.
 ```
 
 Unlike the pre-commit template, this file stays managed after bootstrap.
-Installing a profile also writes `.taskfiles/claude-profile`, a committed
-one-line marker naming the profile, so the choice is recorded in the repo
-instead of living only in a gitignored `.envrc`. `task sync` resolves which
-profile to use, in order: an explicit `TASKFILES_CLAUDE_PROFILE` env var (if
-set and non-empty, it always wins) - otherwise the committed
-`.taskfiles/claude-profile` marker - otherwise neither is set and
-`.claude/settings.json` is left alone. `sync` only reads the marker, never
-writes it.
+Installing a profile also records `TASKFILES_CLAUDE_PROFILE` in the committed
+`.taskfiles/config` (see [Repo config](#repo-config-taskfilesconfig) below),
+so the choice travels with the repo instead of living only in a gitignored
+`.envrc`. `task sync` resolves which profile to use, in order: an explicit
+`TASKFILES_CLAUDE_PROFILE` env var or CLI arg (always wins) - otherwise the
+value in `.taskfiles/config` - otherwise an ambient environment variable -
+otherwise neither is set and `.claude/settings.json` is left alone.
 
-**Behavioural change:** previously, a bare `task sync` with no
-`TASKFILES_CLAUDE_PROFILE` set never touched a committed `.claude/settings.json`,
-even if the repo had bootstrapped with a profile - propagation required the
-variable to be set in that repo's own environment. Now that `init.sh` writes
-the marker, a bare `task sync` in such a repo refreshes `.claude/settings.json`
-from `claude/<name>.json` upstream on every run, with no environment variable
-needed. Set `export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` only when
-you need to override the committed marker for that checkout.
+**Behavioural change:** without a `.taskfiles/config` entry, a bare `task sync`
+with no `TASKFILES_CLAUDE_PROFILE` set never touches a committed
+`.claude/settings.json`, even if the repo had bootstrapped with a profile -
+propagation requires the config file or the env var. A repo bootstrapped with
+`claude=PROFILE` gets it recorded in `.taskfiles/config`, so a bare `task sync`
+refreshes `.claude/settings.json` from `claude/<name>.json` upstream on every
+run, with no environment variable needed. Set
+`export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` only when you need
+to override the committed config for that checkout.
+
+## Repo config (`.taskfiles/config`)
+
+`.taskfiles/config` is an optional, committed, plain `KEY="value"` file the
+root Taskfile loads via Task's `dotenv:` directive. It exists because
+`.envrc` is gitignored, so nothing in-repo otherwise records certain
+per-repo choices - a bare `task sync` would silently drift (e.g. skip
+refreshing a vendored shared file it doesn't know about) with no error. It
+supersedes the v1.3.0 `.taskfiles/claude-profile` marker.
+
+`init.sh` writes it after bootstrapping, recording only what that run
+actually did:
+
+```bash
+# .taskfiles/config
+TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh go.yml"
+TASKFILES_CLAUDE_PROFILE="terraform"
+PRECOMMIT="terraform"
+```
+
+- `TASKFILES_FILES` - which shared files this repo vendors.
+- `TASKFILES_CLAUDE_PROFILE` - the Claude Code profile, if one was installed.
+- `PRECOMMIT` - which `precommit/` template seeded `.pre-commit-config.yaml`.
+  **Recorded only** - `sync` never reads or acts on this key, because
+  `.pre-commit-config.yaml` is repo-owned and hand-tunable (see
+  [STANDARD.md](STANDARD.md)); re-syncing it would clobber local edits.
+
+`TASKFILES_REF` is deliberately not recorded here - `task release` already
+stamps it into `Taskfile.yaml`'s `sync` default.
+
+Resolution order for any var `.taskfiles/config` sets, high to low: a CLI arg
+> the value in `.taskfiles/config` > an ambient environment variable > the
+taskfile's built-in default. The config file deliberately outranks a stray
+ambient env var - the same hazard class the v1.2.1 `TASKFILES_` namespacing
+fixed - while a CLI arg can still override it for a one-off. A missing
+`.taskfiles/config` is not an error; defaults apply as before. If
+`.taskfiles/config` already exists, `init.sh` leaves it alone.
 
 ## Refresh an already-adopted repo
 
@@ -126,8 +164,13 @@ upgrade. Upgrading is explicit:
 ```bash
 task sync                                   # stay on the current version (idempotent)
 task sync TASKFILES_REF=v1.1.0             # upgrade to a newer release (one-off)
-task sync TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"
+task sync TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"  # one-off file-list override
 ```
+
+A repo that vendors an optional shared file (e.g. `go.yml`) should record it
+in the committed `.taskfiles/config` (`init.sh` does this automatically), not
+just pass it on the CLI - otherwise a later bare `task sync` falls back to the
+built-in default list, which omits it, and that file silently goes stale.
 
 `TASKFILES_REF` for `sync` must be a concrete tag (unlike `init.sh`, `sync` does
 not resolve `latest`). `sync` overwrites only the generic root `Taskfile.yaml`
@@ -136,16 +179,18 @@ and files under `.taskfiles/shared/`; it never writes to `.taskfiles/project/`.
 ### Pin a version durably (recommended)
 
 Because `task sync` overwrites the root `Taskfile.yaml`, editing its default ref
-won't stick. Both sync vars are read from an env var of the same name (a CLI arg
-still overrides), so pin them in the repo's `.envrc` instead — it isn't synced:
+won't stick. `TASKFILES_REF` is a per-checkout override, not something to
+commit (see [Repo config](#repo-config-taskfilesconfig) above for why), so pin
+it in the repo's `.envrc` instead — it isn't synced:
 
 ```bash
 # .envrc
 export TASKFILES_REF="v1.1.0"
-export TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"
 ```
 
-Then `task sync` always tracks that ref and file set. See [`example.envrc`](example.envrc).
+`TASKFILES_FILES`, by contrast, is repo data everyone who clones the repo
+needs - commit it in `.taskfiles/config` instead (`init.sh` does this for
+you). See [`example.envrc`](example.envrc) for the `.envrc` template.
 
 ## The git workflow (from `git.yml`)
 
