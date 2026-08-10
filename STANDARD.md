@@ -32,11 +32,17 @@ implementation is this repo.
   happens next: the `.pre-commit-config.yaml` `init.sh` drops is repo-owned and
   `sync` never touches it again, but the `.claude/settings.json` it writes **is**
   sync-managed - `task sync` refreshes it from `claude/<name>.json` upstream
-  whenever `CLAUDE_PROFILE` is set, so a change to a profile reaches every repo
-  that uses it on its next sync. The generated file is still committed and is
-  what a fresh clone reads; `CLAUDE_PROFILE` in `.envrc` only drives
-  regeneration. `sync` no-ops when `CLAUDE_PROFILE` is unset or empty, so a bare
-  `task sync` never touches the committed file.
+  whenever `TASKFILES_CLAUDE_PROFILE` is set. Propagation is conditional, not
+  automatic: a change to a profile reaches a repo only if that repo has
+  `export TASKFILES_CLAUDE_PROFILE=<name>` set in its own environment
+  (typically via its gitignored `.envrc`) at the moment `task sync` runs there.
+  Nothing in-repo records which profile a repo uses - a fresh clone with no
+  `.envrc` (or anyone else's checkout without that export) has
+  `TASKFILES_CLAUDE_PROFILE` unset, so `sync` no-ops forever and the committed
+  `.claude/settings.json` stays frozen at whatever was last generated. That
+  committed file is what a fresh clone actually reads; `sync` no-ops when
+  `TASKFILES_CLAUDE_PROFILE` is unset or empty, so a bare `task sync` never
+  touches the committed file.
 
 ## Tasks
 
