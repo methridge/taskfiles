@@ -170,7 +170,7 @@ actually did:
 
 ```bash
 # .taskfiles/config
-TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh go.yml"
+TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/push.sh scripts/review.sh go.yml"
 TASKFILES_CLAUDE_PROFILE="terraform"
 PRECOMMIT="terraform"
 ```
@@ -208,7 +208,7 @@ upgrade. Upgrading is explicit:
 ```bash
 task sync                                   # stay on the current version (idempotent)
 task sync TASKFILES_REF=v1.1.0             # upgrade to a newer release (one-off)
-task sync TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"  # one-off file-list override
+task sync TASKFILES_FILES="git.yml go.yml scripts/lib.sh scripts/merge.sh scripts/push.sh scripts/review.sh"  # one-off file-list override
 ```
 
 A repo that vendors an optional shared file (e.g. `go.yml`) should record it

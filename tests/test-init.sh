@@ -185,7 +185,7 @@ fi
 w="$(run claude=terraform)"
 if [[ -f "$w/.taskfiles/config" ]] \
   && grep -q 'TASKFILES_CLAUDE_PROFILE="terraform"' "$w/.taskfiles/config" \
-  && grep -q 'TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"' "$w/.taskfiles/config"; then
+  && grep -q 'TASKFILES_FILES="git.yml scripts/lib.sh scripts/merge.sh scripts/push.sh scripts/review.sh"' "$w/.taskfiles/config"; then
   report "claude=terraform records profile in config" ok
 else
   report "claude=terraform records profile in config" no

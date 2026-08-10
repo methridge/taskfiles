@@ -65,7 +65,7 @@ for a in "$@"; do
 done
 set -- "${REST[@]+"${REST[@]}"}"
 
-SHARED=(git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh "$@")
+SHARED=(git.yml scripts/lib.sh scripts/merge.sh scripts/push.sh scripts/review.sh "$@")
 
 echo "Bootstrapping from methridge/taskfiles @ ${REF}"
 

@@ -48,7 +48,7 @@ tasks:
     # with TASKFILES_REF on the CLI or, durably, `export TASKFILES_REF` in .envrc.
     vars:
       TASKFILES_REF: '{{.TASKFILES_REF | default "v1.6.1"}}'
-      TASKFILES_FILES: '{{.TASKFILES_FILES | default "git.yml scripts/lib.sh scripts/merge.sh scripts/review.sh"}}'
+      TASKFILES_FILES: '{{.TASKFILES_FILES | default "git.yml scripts/lib.sh scripts/merge.sh scripts/push.sh scripts/review.sh"}}'
       # Claude Code plugin profile for this repo (claude/<name>.json upstream).
       # Resolution order, high to low: a CLI arg (TASKFILES_CLAUDE_PROFILE=...)
       # -> the value from .taskfiles/config, if present (loaded above via
