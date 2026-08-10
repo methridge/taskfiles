@@ -65,7 +65,12 @@ tasks:
         else
           mv "$tmp" Taskfile.yaml
           git add Taskfile.yaml
-          git commit -m "chore: release {{.VERSION}}"
+          # This is an automated, intentional commit to main (the documented
+          # release flow: merge PR, checkout main, task release) - not the
+          # human hand-commit no-commit-to-branch exists to stop. Skip only
+          # that one hook so trailing-whitespace/end-of-file/check-yaml still
+          # run on the stamped file.
+          SKIP=no-commit-to-branch git commit -m "chore: release {{.VERSION}}"
         fi
       - git tag -s {{.VERSION}} -m "{{.VERSION}}"
       - git push
