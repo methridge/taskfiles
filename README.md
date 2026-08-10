@@ -83,7 +83,7 @@ existing `.claude/settings.json` is never overwritten, and when one already
 exists `init.sh` also skips recording the profile in `.taskfiles/config` (see
 below), so the two never disagree about which profile - if any - is installed.
 
-Valid profiles: `terraform`, `terraform-provider`, `packer`, `claude-config`.
+Valid profiles: `terraform`, `packer`, `claude-config`.
 
 ```bash
 # add a Claude Code plugin profile
@@ -111,6 +111,35 @@ refreshes `.claude/settings.json` from `claude/<name>.json` upstream on every
 run, with no environment variable needed. Set
 `export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` only when you need
 to override the committed config for that checkout.
+
+#### Optional per-profile MCP server
+
+A profile may also ship a sibling `claude/<profile>.mcp.json` upstream (shape
+`{"mcpServers": {...}}`, supporting `${VAR}` / `${VAR:-default}` expansion).
+Today only `terraform` has one - it restores the Terraform registry MCP
+server (9 tools) that the old `terraform-module-generation` plugin bundled
+inline, which the consolidated `terraform` plugin does not ship. Both `init.sh`
+and `task sync` fetch `claude/<profile>.mcp.json` alongside the profile's
+`.json` and, if it exists, write it to the repo root as `./.mcp.json` (the
+location Claude Code reads project-scoped MCP servers from - not under
+`.claude/`).
+
+Most profiles have no `.mcp.json` upstream. A failed fetch for one is normal
+and silent - not an error, not a warning - and in that case any existing
+`./.mcp.json` is left alone: a repo may define its own MCP servers, and
+neither `init.sh` nor `task sync` should ever delete a file they did not
+write. One consequence worth knowing: switching a repo from a profile with an
+`.mcp.json` (e.g. `terraform`) to one without leaves the old `.mcp.json`
+behind - it is not cleaned up automatically, and must be removed by hand.
+
+`.mcp.json` otherwise follows the same install-vs-sync split as
+`.claude/settings.json`: `init.sh` never overwrites an existing `.mcp.json`
+under any circumstance, bootstrap-time only, same as
+`.claude/settings.json`. `task sync`, by contrast, treats `.mcp.json` as
+sync-managed when the resolved profile has one upstream - a bare `task sync`
+against the `terraform` profile refreshes `./.mcp.json` from
+`claude/terraform.mcp.json` every run, overwriting whatever was there before,
+exactly as it already does for `.claude/settings.json`.
 
 ### Changing the profile safely
 

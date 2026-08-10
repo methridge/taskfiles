@@ -107,6 +107,22 @@ tasks:
             echo "Failed to fetch claude profile '${profile}'; .claude/settings.json left untouched." >&2
             exit 1
           fi
+
+          # Optional per-profile MCP server (claude/<profile>.mcp.json upstream).
+          # Most profiles have none - a fetch failure here is the normal case,
+          # not an error, so it is silent. When a profile HAS no .mcp.json, any
+          # existing ./.mcp.json is left alone: a repo may have its own MCP
+          # servers, and sync must never delete a file it did not write.
+          # Consequence: switching a repo from a profile with an .mcp.json
+          # (e.g. terraform) to one without leaves that .mcp.json behind -
+          # remove it by hand.
+          mcp_tmp="$(mktemp)"
+          if curl -fsSL "{{.TASKFILES_BASE}}/claude/${profile}.mcp.json" -o "$mcp_tmp" 2>/dev/null; then
+            mv "$mcp_tmp" .mcp.json
+            echo "Synced .mcp.json (claude profile: ${profile})."
+          else
+            rm -f "$mcp_tmp"
+          fi
         fi
 
   claude:*:
@@ -130,7 +146,7 @@ tasks:
 
         if ! curl -fsSL "{{.TASKFILES_BASE}}/claude/${profile}.json" -o /dev/null; then
           echo "Unknown claude profile '${profile}' (no claude/${profile}.json at {{.TASKFILES_BASE}})." >&2
-          echo "Valid: terraform, terraform-provider, packer, claude-config." >&2
+          echo "Valid: terraform, packer, claude-config." >&2
           exit 1
         fi
 
