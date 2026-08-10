@@ -243,7 +243,7 @@ you). See [`example.envrc`](example.envrc) for the `.envrc` template.
 | `merge` (aliases `mr`, `pr`) | Open a PR (GitHub) or MR (GitLab) for the current branch, wait for checks, merge with a real merge commit, clean up. Auto-detects the host. |
 | `review:<PR#>` | Show a GitHub PR (metadata, checks, diff), then optionally approve and merge. |
 | `pre` | `pre-commit autoupdate` + `gc` + `run -a`. |
-| `push` | Branch off `main` (if needed), commit all changes with a timestamp, push. |
+| `push` | Branch off `main` (if needed), commit all changes, push. Commit message defaults to `chore: <timestamp>`; override with `task push MESSAGE="feat: add thing"`. Must be a valid Conventional Commit. |
 | `tag:<v>` / `tag:<v>:<msg>` | Create a signed tag. |
 | `tag0` | Create the first tag (`v0.0.0`). |
 | `tagauto` | Signed tag with auto semantic version (`autotag`, conventional scheme). |
