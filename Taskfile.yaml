@@ -45,21 +45,28 @@ tasks:
       # Claude Code plugin profile for this repo (claude/<name>.json upstream).
       # Empty = leave .claude/settings.json alone, so a bare `task sync` in a
       # fresh clone never wipes the committed file. Set durably in .envrc.
-      CLAUDE_PROFILE: '{{.CLAUDE_PROFILE | default ""}}'
-      BASE: '{{.BASE | default (print "https://raw.githubusercontent.com/methridge/taskfiles/" .TASKFILES_REF)}}'
+      TASKFILES_CLAUDE_PROFILE: '{{.TASKFILES_CLAUDE_PROFILE | default ""}}'
+      TASKFILES_BASE: '{{.TASKFILES_BASE | default (print "https://raw.githubusercontent.com/methridge/taskfiles/" .TASKFILES_REF)}}'
     cmds:
       # Generic root — safe to overwrite; project tasks live in .taskfiles/project/.
-      - curl -fsSL "{{.BASE}}/Taskfile.yaml" -o Taskfile.yaml
+      - curl -fsSL "{{.TASKFILES_BASE}}/Taskfile.yaml" -o Taskfile.yaml
       - for: { var: TASKFILES_FILES, split: " " }
         cmd: |
           mkdir -p ".taskfiles/shared/$(dirname "{{.ITEM}}")"
-          curl -fsSL "{{.BASE}}/.taskfiles/shared/{{.ITEM}}" -o ".taskfiles/shared/{{.ITEM}}"
+          curl -fsSL "{{.TASKFILES_BASE}}/.taskfiles/shared/{{.ITEM}}" -o ".taskfiles/shared/{{.ITEM}}"
           case "{{.ITEM}}" in *.sh) chmod +x ".taskfiles/shared/{{.ITEM}}" ;; esac
       - |
-        if [ -n "{{.CLAUDE_PROFILE}}" ]; then
+        if [ -n "{{.TASKFILES_CLAUDE_PROFILE}}" ]; then
           mkdir -p .claude
-          curl -fsSL "{{.BASE}}/claude/{{.CLAUDE_PROFILE}}.json" -o .claude/settings.json
-          echo "Synced .claude/settings.json (CLAUDE_PROFILE={{.CLAUDE_PROFILE}})."
+          tmp="$(mktemp)"
+          if curl -fsSL "{{.TASKFILES_BASE}}/claude/{{.TASKFILES_CLAUDE_PROFILE}}.json" -o "$tmp"; then
+            mv "$tmp" .claude/settings.json
+            echo "Synced .claude/settings.json (TASKFILES_CLAUDE_PROFILE={{.TASKFILES_CLAUDE_PROFILE}})."
+          else
+            rm -f "$tmp"
+            echo "Failed to fetch claude profile '{{.TASKFILES_CLAUDE_PROFILE}}'; .claude/settings.json left untouched." >&2
+            exit 1
+          fi
         fi
 
   sync:check:

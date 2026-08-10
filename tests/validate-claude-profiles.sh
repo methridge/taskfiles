@@ -7,12 +7,23 @@ set -o pipefail
 
 cd "$(dirname "$0")/.."
 
-names=(terraform terraform-provider packer claude-config)
+# Required profiles: still reported MISSING if absent (the validator's
+# original purpose). This is a floor, not a ceiling - every file matching
+# claude/*.json below is also validated, so a profile added later without
+# being added here is not silently skipped.
+required=(terraform terraform-provider packer claude-config)
 fail=0
-for n in "${names[@]}"; do
+for n in "${required[@]}"; do
   f="claude/${n}.json"
   if [[ ! -f "$f" ]]; then
     echo "MISSING: $f"
+    fail=1
+  fi
+done
+
+for f in claude/*.json; do
+  if [[ ! -f "$f" ]]; then
+    echo "MISSING: claude/*.json (no profiles found)"
     fail=1
     continue
   fi

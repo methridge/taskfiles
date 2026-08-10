@@ -91,7 +91,7 @@ curl -fsSL https://github.com/methridge/taskfiles/releases/latest/download/init.
 ```
 
 Unlike the pre-commit template, this file stays managed after bootstrap: set
-`export CLAUDE_PROFILE="terraform"` in `.envrc` and `task sync` keeps
+`export TASKFILES_CLAUDE_PROFILE="terraform"` in `.envrc` and `task sync` keeps
 `.claude/settings.json` current with the upstream profile.
 
 ## Refresh an already-adopted repo
