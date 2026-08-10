@@ -43,13 +43,16 @@ fi
 
 BASE="${TASKFILES_BASE:-https://raw.githubusercontent.com/methridge/taskfiles/${REF}}"
 
-# Pull an optional `precommit=NAME` token out of the args so it is not treated
-# as an extra shared task file. Default to the base template; `none` opts out.
+# Pull optional `precommit=NAME` and `claude=PROFILE` tokens out of the args so
+# they are not treated as extra shared task files. precommit defaults to the
+# base template (`none` opts out); claude is opt-in and defaults to `none`.
 PRECOMMIT="base"
+CLAUDE_PROFILE="none"
 REST=()
 for a in "$@"; do
   case "$a" in
     precommit=*) PRECOMMIT="${a#precommit=}" ;;
+    claude=*) CLAUDE_PROFILE="${a#claude=}" ;;
     *) REST+=("$a") ;;
   esac
 done
@@ -94,6 +97,24 @@ if [[ "$PRECOMMIT" != "none" ]]; then
       rm -f "$tmp"
       echo "Unknown precommit template '${PRECOMMIT}'." >&2
       echo "Valid: base, terraform, go, ansible, none." >&2
+      exit 1
+    fi
+  fi
+fi
+
+if [[ "$CLAUDE_PROFILE" != "none" ]]; then
+  if [[ -f .claude/settings.json ]]; then
+    echo "Keeping existing .claude/settings.json (left untouched)."
+  else
+    tmp="$(mktemp)"
+    if curl -fsSL "${BASE}/claude/${CLAUDE_PROFILE}.json" -o "$tmp"; then
+      mkdir -p .claude
+      mv "$tmp" .claude/settings.json
+      echo "Installed .claude/settings.json (claude=${CLAUDE_PROFILE})."
+    else
+      rm -f "$tmp"
+      echo "Unknown claude profile '${CLAUDE_PROFILE}'." >&2
+      echo "Valid: terraform, terraform-provider, packer, claude-config, none." >&2
       exit 1
     fi
   fi
