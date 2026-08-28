@@ -70,6 +70,21 @@ implementation is this repo.
     bootstrap-only, never overwrites an existing `.mcp.json` either way.
     Switching a repo away from a profile with an `.mcp.json` leaves the old
     file behind; remove it by hand.
+  - An `.mcp.json` is committed and sync-managed, so it must never carry a
+    credential. Reference one instead - `"TFE_TOKEN": "${TFE_TOKEN}"` - and let
+    Claude Code expand it from the environment `.envrc` provides. Keeping the
+    indirection is what lets the same file be shared across a team whose
+    members hold different tokens, and what keeps `task sync` free to overwrite
+    the file without destroying a secret. Document the variables a profile
+    needs in the repo's `example.envrc`; the template in this repo shows the
+    `terraform` profile's pair. Note the failure mode is quiet: an unset token
+    still starts the server, just with the authenticated tools missing, so
+    verify against the provider's API rather than assuming a clean start means
+    a working credential. Address and token travel together - a token is issued
+    by one Terraform instance and rejected by every other, so pair `TFE_ADDRESS`
+    with the `hostname` in the repo's own `cloud {}` block. Testing a
+    self-hosted token against `app.terraform.io` returns the same 401 as an
+    expired one, which makes a wrong-host mistake read as a dead credential.
 
 ## Repo config (`.taskfiles/config`)
 
